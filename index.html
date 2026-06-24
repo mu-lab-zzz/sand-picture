@@ -297,6 +297,12 @@
             color: #5c4a3e;
             letter-spacing: 0.5px;
         }
+        .store-item .item-swatch {
+            width: 44px;
+            height: 28px;
+            border-radius: 4px;
+            border: 1px solid #3a2e26;
+        }
         .store-item .item-icon {
             font-size: 22px;
             filter: grayscale(1) opacity(0.3);
@@ -304,6 +310,22 @@
         .store-item .item-price {
             color: #776e65;
             font-size: 10px;
+        }
+        .store-item.owned {
+            border-color: #5c4a3e;
+            color: #a09080;
+        }
+        .store-item.active {
+            border-color: #d4af37;
+            color: #d4af37;
+            box-shadow: 0 0 8px rgba(212,175,55,0.2);
+        }
+        .store-item button {
+            margin-top: 2px;
+            padding: 3px 8px;
+            font-size: 10px;
+            border-radius: 3px;
+            letter-spacing: 0.5px;
         }
 
         /* 広告モーダル */
@@ -531,12 +553,33 @@
             }
         }
 
-        const rgbPatches = {
-            2: { r: 212, g: 175, b: 55 },  
-            3: { r: 244, g: 244, b: 240 }, 
-            4: { r: 112, g: 76,  b: 45 },  
-            5: { r: 205, g: 127, b: 50 }   
+        const SAND_COLORS = {
+            desert:   { name: '砂漠',   price: 0,  colors: [[212,175,55],[244,244,240],[112,76,45],[205,127,50]] },
+            ocean:    { name: '深海',   price: 20, colors: [[80,180,220],[180,230,245],[20,60,120],[60,130,200]] },
+            sakura:   { name: '桜',     price: 20, colors: [[240,150,175],[255,220,230],[180,70,110],[220,120,155]] },
+            jade:     { name: '翡翠',   price: 20, colors: [[100,200,130],[200,240,210],[30,100,60],[70,155,100]] },
+            lava:     { name: '溶岩',   price: 20, colors: [[240,80,20],[255,200,50],[140,20,0],[210,110,10]] },
+            amethyst: { name: '紫水晶', price: 20, colors: [[180,100,240],[220,190,255],[80,20,150],[140,60,200]] },
+            silver:   { name: '白銀',   price: 20, colors: [[210,215,225],[240,242,245],[120,125,140],[175,180,195]] },
+            obsidian: { name: '黒曜石', price: 20, colors: [[80,80,95],[140,140,155],[25,25,35],[100,95,115]] },
+            lemon:    { name: 'レモン', price: 20, colors: [[240,230,50],[255,248,180],[160,140,10],[210,195,40]] },
         };
+
+        let rgbPatches = {
+            2: { r: 212, g: 175, b: 55 },
+            3: { r: 244, g: 244, b: 240 },
+            4: { r: 112, g: 76,  b: 45 },
+            5: { r: 205, g: 127, b: 50 }
+        };
+
+        function applySandColors(key) {
+            const c = SAND_COLORS[key].colors;
+            rgbPatches[2] = { r: c[0][0], g: c[0][1], b: c[0][2] };
+            rgbPatches[3] = { r: c[1][0], g: c[1][1], b: c[1][2] };
+            rgbPatches[4] = { r: c[2][0], g: c[2][1], b: c[2][2] };
+            rgbPatches[5] = { r: c[3][0], g: c[3][1], b: c[3][2] };
+            localStorage.setItem('sandpicture_active_sand', key);
+        }
 
         let bubbles = [];
 
@@ -1118,39 +1161,77 @@
         adModal.addEventListener('click', e => { if (e.target === adModal) adModal.classList.remove('active'); });
 
         // ストアデータ
-        const STORE_ITEMS = {
-            sand: [
-                { name: '砂漠の金砂', icon: '🏜️', price: 30 },
-                { name: '深海の砂', icon: '🌊', price: 30 },
-                { name: '桜色の砂', icon: '🌸', price: 50 },
-                { name: '夜光の砂', icon: '✨', price: 80 },
-            ],
-            bg: [
-                { name: '宇宙', icon: '🌌', price: 50 },
-                { name: '深海', icon: '🐠', price: 50 },
-                { name: '夕暮れ', icon: '🌅', price: 50 },
-            ],
-            tank: [
-                { name: '竹枠', icon: '🎋', price: 40 },
-                { name: '金縁', icon: '🖼️', price: 60 },
-                { name: '丸型', icon: '⭕', price: 80 },
-            ],
-            bgm: [
-                { name: '瞑想', icon: '🎵', price: 40 },
-                { name: '波音', icon: '🌊', price: 40 },
-                { name: '雨音', icon: '🌧️', price: 40 },
-            ],
+        const STORE_OTHER = {
+            bg:   [{ name: '宇宙', price: 50 }, { name: '深海', price: 50 }, { name: '夕暮れ', price: 50 }],
+            tank: [{ name: '竹枠', price: 40 }, { name: '金縁', price: 60 }, { name: '丸型', price: 80 }],
+            bgm:  [{ name: '瞑想', price: 40 }, { name: '波音', price: 40 }, { name: '雨音', price: 40 }],
         };
 
+        function loadOwnedSands() {
+            try { return JSON.parse(localStorage.getItem('sandpicture_owned_sands') || '["desert"]'); }
+            catch(e) { return ['desert']; }
+        }
+        function saveOwnedSands(arr) { localStorage.setItem('sandpicture_owned_sands', JSON.stringify(arr)); }
+        function loadActiveSand() { return localStorage.getItem('sandpicture_active_sand') || 'desert'; }
+
+        function swatchGradient(key) {
+            const c = SAND_COLORS[key].colors;
+            return `linear-gradient(to right, rgb(${c[0]}) 0%, rgb(${c[0]}) 25%, rgb(${c[1]}) 25%, rgb(${c[1]}) 50%, rgb(${c[2]}) 50%, rgb(${c[2]}) 75%, rgb(${c[3]}) 75%)`;
+        }
+
+        let currentStoreTab = 'sand';
+
         function renderStore(tab) {
+            currentStoreTab = tab;
             const grid = document.getElementById('store-grid');
-            grid.innerHTML = STORE_ITEMS[tab].map(item => `
-                <div class="store-item">
-                    <div class="item-icon">${item.icon}</div>
-                    <div>${item.name}</div>
-                    <div class="item-price">🪙 ${item.price}</div>
-                </div>
-            `).join('');
+            const owned = loadOwnedSands();
+            const active = loadActiveSand();
+
+            if (tab === 'sand') {
+                grid.innerHTML = Object.entries(SAND_COLORS).map(([key, s]) => {
+                    const isOwned  = owned.includes(key);
+                    const isActive = active === key;
+                    const cls = isActive ? 'store-item active' : isOwned ? 'store-item owned' : 'store-item';
+                    const btn = isActive
+                        ? `<button disabled style="opacity:0.5;">使用中</button>`
+                        : isOwned
+                        ? `<button data-buy="${key}" data-owned="1">選択</button>`
+                        : `<button data-buy="${key}">🪙 ${s.price}</button>`;
+                    return `<div class="${cls}">
+                        <div class="item-swatch" style="background:${swatchGradient(key)}"></div>
+                        <div>${s.name}</div>
+                        ${btn}
+                    </div>`;
+                }).join('');
+            } else {
+                grid.innerHTML = STORE_OTHER[tab].map(item => `
+                    <div class="store-item">
+                        <div style="font-size:11px;color:#3a2e26;margin-bottom:4px;">準備中</div>
+                        <div>${item.name}</div>
+                        <div class="item-price">${item.price} コイン</div>
+                    </div>
+                `).join('');
+            }
+
+            grid.querySelectorAll('button[data-buy]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const key = btn.dataset.buy;
+                    if (btn.dataset.owned) {
+                        applySandColors(key);
+                        renderStore('sand');
+                        return;
+                    }
+                    const coins = loadCoins();
+                    const price = SAND_COLORS[key].price;
+                    if (coins < price) { alert('コインが足りません'); return; }
+                    saveCoins(coins - price);
+                    const owned = loadOwnedSands();
+                    owned.push(key);
+                    saveOwnedSands(owned);
+                    applySandColors(key);
+                    renderStore('sand');
+                });
+            });
         }
 
         const storeModal = document.getElementById('storeModal');
@@ -1173,6 +1254,7 @@
         // 初期化
         saveCoins(loadCoins());
         updateAdBtn();
+        applySandColors(loadActiveSand());
         // ─────────────────────────────────────────────────
 
         loadSettings();
