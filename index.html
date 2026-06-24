@@ -299,6 +299,7 @@
             <div class="modal-actions">
                 <button class="close-btn" id="closeSettingsBtn">設定を閉じる</button>
             </div>
+            <p style="text-align:center; margin:12px 0 0; font-size:11px; color:#5c4a3e; letter-spacing:1px;">Ver 1.00</p>
         </div>
     </div>
 
@@ -421,7 +422,7 @@
         function syncGridObstacles() {
             const numBubbles = parseInt(document.getElementById('bubbleCount').value) || 0;
             for (let i = 0; i < numBubbles; i++) {
-                let bx = Math.floor(COLS * 0.05 + Math.random() * (COLS * 0.9));
+                let bx = Math.floor(Math.random() * COLS);
                 let by = Math.floor(ROWS * 0.22 + Math.random() * (ROWS * 0.12));
                 let br = Math.max(1, Math.floor((4 + Math.random() * 5) / SCALE));
                 const rMin = Math.max(0, by - br), rMax = Math.min(ROWS - 1, by + br);
