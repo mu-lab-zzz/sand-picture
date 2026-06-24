@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>サンドピクチャー・シミュレーター</title>
+    <style>
+        body {
+            background-color: #121214;
+            color: #e0e0e0;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            letter-spacing: 3px;
+            color: #d4af37;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        #canvas-container {
+            border: 12px solid #2c1d11;
+            border-radius: 8px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.7);
+            background: #1a1a2e;
+            padding: 0;
+            position: relative;
+        }
+        canvas {
+            display: block;
+            filter: blur(0.5px) contrast(1.05);
+        }
+        #fps-counter {
+            position: absolute;
+            bottom: 6px;
+            right: 8px;
+            color: rgba(255,255,255,0.18);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 10px;
+            font-weight: normal;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            align-items: center;
+            max-width: 400px;
+        }
+        /* 大人の癒しをテーマにしたシックなボタンデザイン */
+        button {
+            background: linear-gradient(135deg, #3a2e26, #261c15);
+            color: #e6cfac;
+            border: 1px solid #5c4a3e;
+            padding: 10px 20px;
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background: linear-gradient(135deg, #4a3b32, #3a2e26);
+            border-color: #d4af37;
+            color: #f5e6d3;
+            box-shadow: 0 6px 15px rgba(212, 175, 55, 0.15);
+        }
+        button:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+        /* 設定ボタンの特別な装飾 */
+        #openSettingsBtn {
+            background: linear-gradient(135deg, #2c2520, #1a1512);
+            border-color: #d4af37;
+            color: #d4af37;
+        }
+        #openSettingsBtn:hover {
+            background: linear-gradient(135deg, #3d332c, #2c2520);
+            box-shadow: 0 6px 15px rgba(212, 175, 55, 0.3);
+        }
+        .info {
+            margin-top: 15px;
+            font-size: 11px;
+            color: #776e65;
+            text-align: center;
+            max-width: 350px;
+            line-height: 1.5;
+            letter-spacing: 0.5px;
+        }
+
+        /* 洗練された設定画面（モーダル）のスタイル */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 8, 7, 0.75);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-wrapper {
+            background: linear-gradient(145deg, #231c18, #16110e);
+            border: 1px solid #d4af37;
+            border-radius: 12px;
+            padding: 25px;
+            width: 85%;
+            max-width: 340px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.8), inset 0 0 20px rgba(212, 175, 55, 0.05);
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        .modal-overlay.active .modal-wrapper {
+            transform: scale(1);
+        }
+        .modal-title {
+            font-size: 1.1rem;
+            color: #d4af37;
+            margin-top: 0;
+            margin-bottom: 20px;
+            text-align: center;
+            letter-spacing: 2px;
+            border-bottom: 1px solid #3a2e26;
+            padding-bottom: 10px;
+        }
+        .modal-content {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .param-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #cbd5e1;
+            letter-spacing: 0.5px;
+        }
+        .param-group select {
+            background: #120d0b;
+            color: #d4af37;
+            border: 1px solid #5c4a3e;
+            border-radius: 4px;
+            padding: 6px 10px;
+            width: 120px;
+            text-align-last: center;
+            font-weight: bold;
+            font-size: 13px;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .param-group select:focus {
+            border-color: #d4af37;
+        }
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .slider-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #cbd5e1;
+            letter-spacing: 0.5px;
+        }
+        .slider-row label {
+            min-width: 100px;
+        }
+        .slider-row .slider-val {
+            color: #d4af37;
+            font-weight: bold;
+            min-width: 30px;
+            text-align: right;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 130px;
+            height: 4px;
+            border-radius: 2px;
+            background: #5c4a3e;
+            outline: none;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #d4af37;
+            cursor: pointer;
+            box-shadow: 0 0 4px rgba(212, 175, 55, 0.5);
+        }
+        .modal-actions {
+            margin-top: 25px;
+            display: flex;
+            justify-content: center;
+        }
+        .close-btn {
+            background: linear-gradient(135deg, #5c4a3e, #4a3b32);
+            color: #f5e6d3;
+            border: 1px solid #7a6556;
+            width: 100%;
+            padding: 10px;
+            font-weight: bold;
+            border-radius: 6px;
+        }
+        .close-btn:hover {
+            background: linear-gradient(135deg, #6e594b, #5c4a3e);
+            border-color: #d4af37;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>SAND PICTURE</h1>
+    <div id="canvas-container">
+        <div id="fps-counter">FPS: --</div>
+        <canvas id="sandCanvas"></canvas>
+    </div>
+    
+    <div class="controls">
+        <button id="flipBtn">上下をひっくり返す</button>
+        <button id="resetBtn">泡を再配置</button>
+        <button id="openSettingsBtn">演出設定 ⚙️</button>
+    </div>
+    
+    <div class="info">
+        静かに流れ落ちる砂の情緒をお楽しみください。
+    </div>
+
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-wrapper">
+            <h2 class="modal-title">SETTINGS</h2>
+            <div class="modal-content">
+                <div class="slider-group">
+                    <div class="slider-row">
+                        <label for="bubbleCount">泡の数</label>
+                        <input type="range" id="bubbleCount" value="40" min="0" max="200">
+                        <span class="slider-val" id="bubbleCountVal">40</span>
+                    </div>
+                    <div class="slider-row">
+                        <label for="sandScale">粒サイズ</label>
+                        <input type="range" id="sandScale" value="1" min="1" max="5">
+                        <span class="slider-val" id="sandScaleVal">1</span>
+                    </div>
+                </div>
+                <div class="param-group">
+                    <label>画面のボカシ効果</label>
+                    <button id="blurToggleBtn" style="padding: 6px 12px; min-width: 90px;">ボカシ: ON</button>
+                </div>
+                <div class="param-group">
+                    <label>スマート傾き検知</label>
+                    <button id="tiltToggleBtn" style="padding: 6px 12px; min-width: 90px;">検知: OFF</button>
+                </div>
+                <div class="param-group">
+                    <label>色彩による重さの差</label>
+                    <button id="weightToggleBtn" style="padding: 6px 12px; min-width: 90px;">重さ: ON</button>
+                </div>
+                <div class="param-group">
+                    <label>FPS表示</label>
+                    <button id="fpsToggleBtn" style="padding: 6px 12px; min-width: 90px;">FPS: OFF</button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="close-btn" id="closeSettingsBtn">設定を閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('sandCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let SCALE = 1; 
+        let COLS, ROWS;
+        let grid;
+        let precomputedNoise;
+        let precomputedSparkle;
+
+        let tiltEnabled = false;
+        let tiltX = 0;
+        let weightDifferenceEnabled = true;
+        let fpsVisible = false;
+        let isBlurOn = true;
+
+        function saveSettings() {
+            const s = {
+                bubbleCount: document.getElementById('bubbleCount').value,
+                sandScale: document.getElementById('sandScale').value,
+                blur: isBlurOn,
+                weight: weightDifferenceEnabled,
+                fps: fpsVisible
+            };
+            localStorage.setItem('sandpicture_settings', JSON.stringify(s));
+        }
+
+        function loadSettings() {
+            const raw = localStorage.getItem('sandpicture_settings');
+            if (!raw) return;
+            try {
+                const s = JSON.parse(raw);
+                if (s.bubbleCount != null) {
+                    document.getElementById('bubbleCount').value = s.bubbleCount;
+                    document.getElementById('bubbleCountVal').textContent = s.bubbleCount;
+                }
+                if (s.sandScale != null) {
+                    document.getElementById('sandScale').value = s.sandScale;
+                    document.getElementById('sandScaleVal').textContent = s.sandScale;
+                }
+                if (s.blur != null) isBlurOn = s.blur;
+                if (s.weight != null) weightDifferenceEnabled = s.weight;
+                if (s.fps != null) fpsVisible = s.fps;
+            } catch(e) {}
+        }
+
+        function setupSimulation() {
+            let level = parseInt(document.getElementById('sandScale').value) || 3;
+            if (level < 1) level = 1;
+            if (level > 5) level = 5;
+
+            if (level === 1) {
+                SCALE = 0.5;         
+                canvas.width = 600;  
+                canvas.height = 800;
+            } else if (level === 2) {
+                SCALE = 0.707;       
+                canvas.width = 424;  
+                canvas.height = 565;
+            } else if (level === 3) {
+                SCALE = 1;           
+                canvas.width = 300;  
+                canvas.height = 400;
+            } else if (level === 4) {
+                SCALE = 2;           
+                canvas.width = 150;  
+                canvas.height = 200;
+            } else if (level === 5) {
+                SCALE = 4;           
+                canvas.width = 75;   
+                canvas.height = 100;
+            }
+
+            canvas.style.width = "300px";
+            canvas.style.height = "400px";
+            
+            COLS = canvas.width;
+            ROWS = canvas.height;
+
+            grid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+
+            precomputedNoise = Array(ROWS).fill().map((_, r) => 
+                Array(COLS).fill().map((_, c) => {
+                    let u = Math.sin(r * 12.9898 + c * 78.233) * 43758.5453;
+                    return (u - Math.floor(u)) * 14 - 7;
+                })
+            );
+
+            precomputedSparkle = Array(ROWS).fill().map((_, r) => 
+                Array(COLS).fill().map((_, c) => {
+                    return Math.abs((Math.sin(c * 123.4 + r * 567.8) * 9999) % 1);
+                })
+            );
+        }
+
+        const rgbPatches = {
+            2: { r: 212, g: 175, b: 55 },  
+            3: { r: 244, g: 244, b: 240 }, 
+            4: { r: 112, g: 76,  b: 45 },  
+            5: { r: 205, g: 127, b: 50 }   
+        };
+
+        let bubbles = [];
+
+        let lastTime = performance.now();
+        let frameCount = 0;
+        const fpsEl = document.getElementById('fps-counter');
+
+        function isWall(r, c) {
+            return false;
+        }
+
+        function initBubbles() {
+            for(let r=0; r<ROWS; r++) {
+                for(let c=0; c<COLS; c++) {
+                    if(grid[r][c] === 1) grid[r][c] = 0;
+                }
+            }
+            syncGridObstacles();
+        }
+
+        function syncGridObstacles() {
+            const numBubbles = parseInt(document.getElementById('bubbleCount').value) || 0;
+            for(let i=0; i<numBubbles; i++) {
+                let bx = Math.floor(COLS * 0.05 + Math.random() * (COLS * 0.9));
+                let by = Math.floor(ROWS * 0.22 + Math.random() * (ROWS * 0.12));
+                
+                let br = Math.floor((4 + Math.random() * 5) / SCALE); 
+                br = Math.max(1, br);
+                
+                for(let r = Math.max(0, by-br); r <= Math.min(ROWS-1, by+br); r++) {
+                    for(let c = Math.max(0, bx-br); c <= Math.min(COLS-1, bx+br); c++) {
+                        if((c-bx)*(c-bx) + (r-by)*(r-by) <= br*br) {
+                            if(grid[r][c] === 0 && !isWall(r, c)) {
+                                grid[r][c] = 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function initSand() {
+            const sandRows = Math.floor(ROWS * 0.225); 
+            for(let r=0; r<sandRows; r++) { 
+                for(let c=0; c<COLS; c++) {
+                    if(Math.random() < 0.9) {
+                        const rand = Math.random();
+                        if(rand < 0.25) grid[r][c] = 2;
+                        else if(rand < 0.50) grid[r][c] = 3;
+                        else if(rand < 0.80) grid[r][c] = 4;
+                        else grid[r][c] = 5;
+                    }
+                }
+            }
+        }
+
+        function countNeighbors(r, c, type) {
+            let count = 0;
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+                    let nr = r + dr;
+                    let nc = c + dc;
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                        if (grid[nr][nc] === type) count++;
+                    }
+                }
+            }
+            return count;
+        }
+
+        let flipX = false;
+        function update() {
+            let moved = Array(ROWS).fill().map(() => Array(COLS).fill(false));
+            flipX = !flipX;
+
+            for (let r = ROWS - 1; r >= 0; r--) {
+                for (let i = 0; i < COLS; i++) {
+                    let c = flipX ? i : (COLS - 1 - i);
+                    
+                    if (moved[r][c] || isWall(r, c)) continue;
+                    let type = grid[r][c];
+                    
+                    if (type >= 2) {
+                        let hasUpperSand = (r > 0 && grid[r - 1][c] >= 2);
+                        let moveChance = hasUpperSand ? 0.9 : 0.25;
+                        
+                        if (weightDifferenceEnabled) {
+                            if (type === 2) moveChance = hasUpperSand ? 0.98 : 0.40;      
+                            else if (type === 4) moveChance = hasUpperSand ? 0.90 : 0.25; 
+                            else if (type === 5) moveChance = hasUpperSand ? 0.82 : 0.20; 
+                            else if (type === 3) moveChance = hasUpperSand ? 0.60 : 0.08; 
+                        }
+
+                        if (Math.random() > moveChance) continue;
+
+                        let tilted = false;
+                        if (tiltEnabled && Math.abs(tiltX) > 0.15 && Math.random() < Math.abs(tiltX) * 0.85) {
+                            let dir = tiltX > 0 ? 1 : -1;
+                            let targetC = c + dir;
+                            if (r + 1 < ROWS && targetC >= 0 && targetC < COLS && !isWall(r + 1, targetC)) {
+                                let target = grid[r + 1][targetC];
+                                if (target === 0) {
+                                    grid[r + 1][targetC] = type;
+                                    grid[r][c] = 0;
+                                    moved[r + 1][targetC] = true;
+                                    tilted = true;
+                                } else if (target === 1) {
+                                    let breakthroughChance = hasUpperSand ? 0.012 : 0.002;
+                                    if (Math.random() < breakthroughChance) {
+                                        grid[r + 1][targetC] = type;
+                                        grid[r][c] = 1;
+                                        moved[r + 1][targetC] = true;
+                                        moved[r][c] = true;
+                                        tilted = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (tilted) continue; 
+
+                        if (r + 1 < ROWS && !isWall(r + 1, c)) {
+                            let target = grid[r + 1][c];
+                            if (target === 0) {
+                                grid[r + 1][c] = type;
+                                grid[r][c] = 0;
+                                moved[r + 1][c] = true;
+                                continue;
+                            } else if (target === 1) {
+                                let breakthroughChance = hasUpperSand ? 0.012 : 0.002;
+                                if (Math.random() < breakthroughChance) {
+                                    grid[r + 1][c] = type;
+                                    grid[r][c] = 1;
+                                    moved[r + 1][c] = true;
+                                    moved[r][c] = true;
+                                    continue;
+                                }
+                            }
+                        }
+
+                        if (r + 1 < ROWS) {
+                            if (Math.random() > 0.2) continue;
+
+                            let leftC = c - 1;
+                            let rightC = c + 1;
+                            let leftEmpty = (leftC >= 0 && !isWall(r + 1, leftC) && (grid[r + 1][leftC] === 0 || (grid[r + 1][leftC] === 1 && Math.random() < 0.002)));
+                            let rightEmpty = (rightC < COLS && !isWall(r + 1, rightC) && (grid[r + 1][rightC] === 0 || (grid[r + 1][rightC] === 1 && Math.random() < 0.002)));
+
+                            if (leftEmpty && rightEmpty) {
+                                let dir = Math.random() < 0.5 ? -1 : 1;
+                                if (tiltEnabled && Math.abs(tiltX) > 0.1) {
+                                    dir = tiltX > 0 ? 1 : -1;
+                                }
+                                let targetC = c + dir;
+                                let targetType = grid[r + 1][targetC];
+                                grid[r + 1][targetC] = type;
+                                grid[r][c] = targetType;
+                                moved[r + 1][targetC] = true;
+                                if (targetType === 1) moved[r][c] = true;
+                            } else if (leftEmpty) {
+                                let targetType = grid[r + 1][leftC];
+                                grid[r + 1][leftC] = type;
+                                grid[r][c] = targetType;
+                                moved[r + 1][leftC] = true;
+                                if (targetType === 1) moved[r][c] = true;
+                            } else if (rightEmpty) {
+                                let targetType = grid[r + 1][rightC];
+                                grid[r + 1][rightC] = type;
+                                grid[r][c] = targetType;
+                                moved[r + 1][rightC] = true;
+                                if (targetType === 1) moved[r][c] = true;
+                            }
+                        }
+                    }
+                    
+                    else if (type === 1) {
+                        if (Math.random() > 0.6) continue;
+
+                        let candidates = [];
+                        let dirs = [
+                            {dr: -1, dc: 0, weight: 3.0},
+                            {dr: -1, dc: -1, weight: 2.0},
+                            {dr: -1, dc: 1, weight: 2.0},
+                            {dr: 0, dc: -1, weight: 1.0},
+                            {dr: 0, dc: 1, weight: 1.0},
+                            {dr: 1, dc: -1, weight: 0.5},
+                            {dr: 1, dc: 1, weight: 0.5}
+                        ];
+
+                        for (let d of dirs) {
+                            let nr = r + d.dr;
+                            let nc = c + d.dc;
+                            if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && !moved[nr][nc]) {
+                                if (grid[nr][nc] === 0) {
+                                    let airScore = countNeighbors(nr, nc, 1);
+                                    let totalScore = d.weight + airScore * 1.5;
+                                    candidates.push({r: nr, c: nc, score: totalScore});
+                                }
+                            }
+                        }
+
+                        if (candidates.length > 0) {
+                            candidates.sort((a, b) => (b.score + Math.random() * 0.5) - (a.score + Math.random() * 0.5));
+                            let best = candidates[0];
+                            
+                            grid[best.r][best.c] = 1;
+                            grid[r][c] = 0;
+                            moved[best.r][best.c] = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        function draw() {
+            const imgData = ctx.createImageData(canvas.width, canvas.height);
+            const data = imgData.data;
+
+            // 各列における「砂の累積厚み」を記録する一時配列
+            let sandThickness = new Array(COLS).fill(0);
+
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    let type = grid[r][c];
+                    let idx = (r * COLS + c) * 4;
+                    
+                    if (type === 0) {
+                        data[idx]     = 26;
+                        data[idx + 1] = 26;
+                        data[idx + 2] = 46;
+                        data[idx + 3] = 255;
+                        sandThickness[c] = 0; // 空気層は光が通過するため厚みをリセット
+                    }
+                    else if (type === 1) {
+                        data[idx]     = 26;
+                        data[idx + 1] = 26;
+                        data[idx + 2] = 46;
+                        data[idx + 3] = 255;
+                        sandThickness[c] = 0; // 泡（気泡）も光を通すため厚みをリセット
+                    } 
+                    else if (type >= 2) {
+                        let thickness = sandThickness[c];
+                        sandThickness[c]++; // 次の行（さらに深い位置）のために厚みを加算
+
+                        let base = rgbPatches[type];
+                        let noise = precomputedNoise[r][c];
+                        
+                        let isSurface = (r > 0 && grid[r - 1][c] < 2);
+                        let isLeftOpen = (c > 0 && grid[r][c - 1] < 2);
+                        let isRightOpen = (c < COLS - 1 && grid[r][c + 1] < 2);
+
+                        let lMod = 0;
+
+                        if (isSurface) lMod += 18 + noise;
+                        if (isLeftOpen) lMod += 10 + noise * 0.5;
+                        if (isRightOpen) lMod -= 14 - noise * 0.3;
+                        
+                        if (!isSurface && !isLeftOpen && !isRightOpen) {
+                            lMod -= 6 + noise * 0.1; 
+                        }
+
+                        // 【修正ロジック】真上の砂の累積厚みに応じて、輝度をじんわりとマイルドに減衰（最大値を制限してチラツキを抑制）
+                        lMod -= Math.min(20, thickness * 0.15);
+
+                        if (type === 2 || type === 5) {
+                            let sparkle = precomputedSparkle[r][c];
+                            if (sparkle > 0.985) lMod += 28;
+                        }
+
+                        let factor = lMod * 2;
+                        data[idx]     = Math.max(0, Math.min(255, base.r + factor));
+                        data[idx + 1] = Math.max(0, Math.min(255, base.g + factor));
+                        data[idx + 2] = Math.max(0, Math.min(255, base.b + factor));
+                        data[idx + 3] = 255;
+                    }
+                }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+
+            let glassGrad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            glassGrad.addColorStop(0, 'rgba(255, 255, 255, 0.06)');
+            glassGrad.addColorStop(0.3, 'rgba(255, 255, 255, 0.02)');
+            glassGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.0)');
+            glassGrad.addColorStop(0.7, 'rgba(255, 255, 255, 0.01)');
+            glassGrad.addColorStop(1, 'rgba(255, 255, 255, 0.04)');
+            ctx.fillStyle = glassGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(-50, 0);
+            ctx.lineTo(canvas.width, canvas.height + 50);
+            ctx.stroke();
+        }
+
+        function loop() {
+            update();
+            draw();
+            frameCount++;
+
+            const now = performance.now();
+            if (now >= lastTime + 500) { 
+                const fps = Math.round((frameCount * 1000) / (now - lastTime));
+                fpsEl.textContent = `FPS: ${fps}`;
+                frameCount = 0;
+                lastTime = now;
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        function flip() {
+            let newGrid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+            
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    let type = grid[r][c];
+                    if (type >= 2) {
+                        let newR = ROWS - 1 - r; 
+                        newGrid[newR][c] = type;
+                    }
+                }
+            }
+            
+            grid = newGrid;
+            syncGridObstacles();
+        }
+
+        document.getElementById('flipBtn').addEventListener('click', flip);
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            initBubbles();
+        });
+
+        document.getElementById('blurToggleBtn').addEventListener('click', () => {
+            isBlurOn = !isBlurOn;
+            applyBlur();
+            saveSettings();
+        });
+
+        document.getElementById('bubbleCount').addEventListener('input', (e) => {
+            document.getElementById('bubbleCountVal').textContent = e.target.value;
+            saveSettings();
+        });
+
+        document.getElementById('sandScale').addEventListener('input', (e) => {
+            document.getElementById('sandScaleVal').textContent = e.target.value;
+        });
+
+        document.getElementById('sandScale').addEventListener('change', () => {
+            setupSimulation();
+            initBubbles();
+            initSand();
+            saveSettings();
+        });
+
+        document.getElementById('tiltToggleBtn').addEventListener('click', async () => {
+            if (!tiltEnabled) {
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    try {
+                        const permissionState = await DeviceOrientationEvent.requestPermission();
+                        if (permissionState === 'granted') {
+                            enableTilt();
+                        } else {
+                            alert('画面の傾き検知へのアクセスが拒否されました。');
+                        }
+                    } catch (error) {
+                        console.error('モーションセンサーエラー:', error);
+                    }
+                } else {
+                    enableTilt();
+                }
+            } else {
+                disableTilt();
+            }
+        });
+
+        function enableTilt() {
+            tiltEnabled = true;
+            document.getElementById('tiltToggleBtn').textContent = "検知: ON";
+            window.addEventListener('deviceorientation', handleOrientation);
+        }
+
+        function disableTilt() {
+            tiltEnabled = false;
+            tiltX = 0;
+            document.getElementById('tiltToggleBtn').textContent = "検知: OFF";
+            window.removeEventListener('deviceorientation', handleOrientation);
+        }
+
+        function handleOrientation(event) {
+            let gamma = event.gamma; 
+            if (gamma !== null) {
+                tiltX = Math.max(-1, Math.min(1, gamma / 30));
+            }
+        }
+
+        let isInteracting = false;
+        let lastCanvasX = null;
+        let lastCanvasY = null;
+
+        function applyTouchInfluence(e) {
+            if (!isInteracting) return;
+            
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const canvasX = Math.floor(((clientX - rect.left) / rect.width) * COLS);
+            const canvasY = Math.floor(((clientY - rect.top) / rect.height) * ROWS);
+
+            if (lastCanvasX !== null && lastCanvasY !== null) {
+                let vx = canvasX - lastCanvasX;
+                let vy = canvasY - lastCanvasY;
+                
+                if (vx !== 0 || vy !== 0) {
+                    const speed = Math.sqrt(vx * vx + vy * vy);
+                    const brushRadius = Math.max(4, Math.floor((8 + speed * 0.4) / SCALE));
+
+                    let cellsToMove = [];
+                    for (let r = Math.max(0, canvasY - brushRadius); r <= Math.min(ROWS - 1, canvasY + brushRadius); r++) {
+                        for (let c = Math.max(0, canvasX - brushRadius); c <= Math.min(COLS - 1, canvasX + brushRadius); c++) {
+                            if ((c - canvasX) * (c - canvasX) + (r - canvasY) * (r - canvasY) <= brushRadius * brushRadius) {
+                                if (grid[r][c] > 0) {
+                                    cellsToMove.push({ r: r, c: c, type: grid[r][c] });
+                                }
+                            }
+                        }
+                    }
+
+                    cellsToMove.sort(() => Math.random() - 0.5);
+
+                    for (let cell of cellsToMove) {
+                        let moveDist = Math.min(6, Math.max(1, Math.floor(speed * 0.3)));
+                        let dx = Math.round((vx / speed) * moveDist) + (Math.floor(Math.random() * 3) - 1);
+                        let dy = Math.round((vy / speed) * moveDist) + (Math.floor(Math.random() * 3) - 1);
+
+                        let nr = cell.r + dy;
+                        let nc = cell.c + dx;
+
+                        if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                            if (grid[nr][nc] === 0) {
+                                grid[nr][nc] = cell.type;
+                                grid[cell.r][cell.c] = 0;
+                            } 
+                            else if (grid[nr][nc] > 0 && Math.random() < 0.7) {
+                                let temp = grid[nr][nc];
+                                grid[nr][nc] = cell.type;
+                                grid[cell.r][cell.c] = temp;
+                            }
+                        }
+                    }
+                }
+            }
+
+            lastCanvasX = canvasX;
+            lastCanvasY = canvasY;
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            isInteracting = true;
+            const rect = canvas.getBoundingClientRect();
+            lastCanvasX = Math.floor(((e.clientX - rect.left) / rect.width) * COLS);
+            lastCanvasY = Math.floor(((e.clientY - rect.top) / rect.height) * ROWS);
+            applyTouchInfluence(e);
+        });
+        window.addEventListener('mousemove', (e) => {
+            applyTouchInfluence(e);
+        });
+        window.addEventListener('mouseup', () => {
+            isInteracting = false;
+            lastCanvasX = null;
+            lastCanvasY = null;
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            isInteracting = true;
+            if (e.touches && e.touches.length > 0) {
+                const rect = canvas.getBoundingClientRect();
+                lastCanvasX = Math.floor(((e.touches[0].clientX - rect.left) / rect.width) * COLS);
+                lastCanvasY = Math.floor(((e.touches[0].clientY - rect.top) / rect.height) * ROWS);
+            }
+            applyTouchInfluence(e);
+            if (e.cancelable) e.preventDefault(); 
+        }, { passive: false });
+        canvas.addEventListener('touchmove', (e) => {
+            applyTouchInfluence(e);
+            if (e.cancelable) e.preventDefault();
+        }, { passive: false });
+        window.addEventListener('touchend', () => {
+            isInteracting = false;
+            lastCanvasX = null;
+            lastCanvasY = null;
+        });
+
+        document.getElementById('weightToggleBtn').addEventListener('click', () => {
+            weightDifferenceEnabled = !weightDifferenceEnabled;
+            document.getElementById('weightToggleBtn').textContent = weightDifferenceEnabled ? "重さ: ON" : "重さ: OFF";
+            saveSettings();
+        });
+
+        document.getElementById('fpsToggleBtn').addEventListener('click', () => {
+            fpsVisible = !fpsVisible;
+            document.getElementById('fpsToggleBtn').textContent = fpsVisible ? "FPS: ON" : "FPS: OFF";
+            fpsEl.style.display = fpsVisible ? '' : 'none';
+            saveSettings();
+        });
+
+        const modal = document.getElementById('settingsModal');
+        document.getElementById('openSettingsBtn').addEventListener('click', () => {
+            modal.classList.add('active');
+        });
+        document.getElementById('closeSettingsBtn').addEventListener('click', () => {
+            modal.classList.remove('active');
+        });
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.classList.remove('active');
+        });
+
+
+        function applyBlur() {
+            canvas.style.filter = isBlurOn ? "" : "contrast(1.05)";
+            document.getElementById('blurToggleBtn').textContent = isBlurOn ? "ボカシ: ON" : "ボカシ: OFF";
+        }
+
+        function applyLoadedSettings() {
+            applyBlur();
+            document.getElementById('weightToggleBtn').textContent = weightDifferenceEnabled ? "重さ: ON" : "重さ: OFF";
+            document.getElementById('fpsToggleBtn').textContent = fpsVisible ? "FPS: ON" : "FPS: OFF";
+            fpsEl.style.display = fpsVisible ? '' : 'none';
+        }
+
+        loadSettings();
+        setupSimulation();
+        initBubbles();
+        initSand();
+        applyLoadedSettings();
+        loop();
+    </script>
+</body>
+</html>
