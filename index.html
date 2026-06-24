@@ -80,39 +80,74 @@
             pointer-events: none;
         }
         .controls {
-            margin-top: 20px;
-            display: grid;
-            grid-template-columns: repeat(3, 90px);
-            gap: 8px;
+            margin-top: 14px;
+            display: flex;
+            flex-wrap: wrap;
             justify-content: center;
+            gap: 6px;
         }
         button {
             background: linear-gradient(160deg, #2e2420, #1c1410);
-            color: #c8b89a;
-            border: 1px solid #4a3a30;
-            padding: 10px 0;
-            width: 90px;
-            font-size: 12px;
+            color: #a09070;
+            border: 1px solid #3a2e24;
+            padding: 6px 10px;
+            font-size: 10px;
             font-weight: 400;
-            letter-spacing: 1.5px;
+            letter-spacing: 1px;
             border-radius: 3px;
             cursor: pointer;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
-            transition: all 0.25s ease;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+            transition: all 0.2s ease;
         }
         button:hover {
-            background: linear-gradient(160deg, #3d3028, #2e2420);
-            border-color: #d4af37;
-            color: #e8d5b0;
-            box-shadow: 0 4px 12px rgba(212,175,55,0.12), inset 0 1px 0 rgba(255,255,255,0.06);
+            border-color: #8a7050;
+            color: #c8b090;
         }
         button:active {
             transform: translateY(1px);
-            box-shadow: 0 1px 4px rgba(0,0,0,0.6);
         }
         button:disabled {
-            opacity: 0.35;
+            opacity: 0.3;
             cursor: default;
+        }
+
+        /* 全画面ボタン（フレーム角） */
+        #fullscreenBtn {
+            position: absolute;
+            top: 4px;
+            right: 6px;
+            width: 18px;
+            height: 18px;
+            padding: 0;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            font-size: 11px;
+            color: rgba(80,50,20,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            cursor: pointer;
+        }
+        #fullscreenBtn:hover {
+            color: rgba(180,120,50,0.8);
+            background: transparent;
+            border: none;
+            box-shadow: none;
+        }
+
+        /* 全画面モード */
+        body.fs-mode {
+            justify-content: center;
+            align-items: center;
+        }
+        body.fs-mode #canvas-container {
+            transform-origin: center center;
+        }
+        body.fs-mode .controls,
+        body.fs-mode #coin-display {
+            display: none;
         }
 
         /* 洗練された設定画面（モーダル）のスタイル */
@@ -375,6 +410,7 @@
     <div id="coin-display">🪙 <span id="coin-count">0</span> コイン</div>
     <div id="canvas-container">
         <div id="frame-title">SAND PICTURE</div>
+        <button id="fullscreenBtn" title="全画面">⛶</button>
         <div id="fps-counter">FPS: --</div>
         <canvas id="sandCanvas"></canvas>
     </div>
@@ -1251,6 +1287,29 @@
                 btn.classList.add('active');
                 renderStore(btn.dataset.tab);
             });
+        });
+
+        // 全画面
+        const fsBtn = document.getElementById('fullscreenBtn');
+        fsBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        });
+        document.addEventListener('fullscreenchange', () => {
+            const isFs = !!document.fullscreenElement;
+            document.body.classList.toggle('fs-mode', isFs);
+            fsBtn.textContent = isFs ? '✕' : '⛶';
+            if (isFs) {
+                const scaleX = window.innerWidth  / (document.getElementById('canvas-container').offsetWidth);
+                const scaleY = window.innerHeight / (document.getElementById('canvas-container').offsetHeight);
+                const scale  = Math.min(scaleX, scaleY) * 0.95;
+                document.getElementById('canvas-container').style.transform = `scale(${scale})`;
+            } else {
+                document.getElementById('canvas-container').style.transform = '';
+            }
         });
 
         // 初期化
