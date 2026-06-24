@@ -111,30 +111,31 @@
             cursor: default;
         }
 
-        /* 全画面ボタン（フレーム角） */
+        /* 全画面ボタン（フレーム彫り込み） */
         #fullscreenBtn {
             position: absolute;
-            top: 4px;
-            right: 6px;
-            width: 18px;
-            height: 18px;
+            top: 0;
+            right: 14px;
+            height: 26px;
             padding: 0;
             background: transparent;
             border: none;
             box-shadow: none;
-            font-size: 11px;
-            color: rgba(80,50,20,0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
+            font-size: 9px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            color: #1e0c04;
+            text-shadow: 0 1px 1px rgba(180,120,50,0.3), 0 -1px 0 rgba(0,0,0,0.4);
             cursor: pointer;
+            z-index: 10;
+            transition: text-shadow 0.2s;
         }
         #fullscreenBtn:hover {
-            color: rgba(180,120,50,0.8);
             background: transparent;
             border: none;
             box-shadow: none;
+            text-shadow: 0 1px 2px rgba(200,150,70,0.5), 0 -1px 0 rgba(0,0,0,0.5);
+            color: #2a1206;
         }
 
         /* 全画面モード */
@@ -410,7 +411,7 @@
     <div id="coin-display">🪙 <span id="coin-count">0</span> コイン</div>
     <div id="canvas-container">
         <div id="frame-title">SAND PICTURE</div>
-        <button id="fullscreenBtn" title="全画面">⛶</button>
+        <button id="fullscreenBtn">全画面</button>
         <div id="fps-counter">FPS: --</div>
         <canvas id="sandCanvas"></canvas>
     </div>
