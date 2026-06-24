@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>サンドピクチャー・シミュレーター</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121214">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <style>
         body {
             background-color: #121214;
@@ -288,6 +291,10 @@
                     <label>FPS表示</label>
                     <button id="fpsToggleBtn" style="padding: 6px 12px; min-width: 90px;">FPS: OFF</button>
                 </div>
+                <div class="param-group">
+                    <label>アプリを最新版に</label>
+                    <button id="updateBtn" style="padding: 6px 12px; min-width: 90px;">更新する</button>
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="close-btn" id="closeSettingsBtn">設定を閉じる</button>
@@ -347,47 +354,47 @@
             if (level > 5) level = 5;
 
             if (level === 1) {
-                SCALE = 0.5;         
-                canvas.width = 600;  
+                SCALE = 0.5;
+                canvas.width = 600;
                 canvas.height = 800;
             } else if (level === 2) {
-                SCALE = 0.707;       
-                canvas.width = 424;  
+                SCALE = 0.707;
+                canvas.width = 424;
                 canvas.height = 565;
             } else if (level === 3) {
-                SCALE = 1;           
-                canvas.width = 300;  
+                SCALE = 1;
+                canvas.width = 300;
                 canvas.height = 400;
             } else if (level === 4) {
-                SCALE = 2;           
-                canvas.width = 150;  
+                SCALE = 2;
+                canvas.width = 150;
                 canvas.height = 200;
             } else if (level === 5) {
-                SCALE = 4;           
-                canvas.width = 75;   
+                SCALE = 4;
+                canvas.width = 75;
                 canvas.height = 100;
             }
 
             canvas.style.width = "300px";
             canvas.style.height = "400px";
-            
+
             COLS = canvas.width;
             ROWS = canvas.height;
+            const SIZE = ROWS * COLS;
 
-            grid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+            grid = new Uint8Array(SIZE);
+            moved = new Uint8Array(SIZE);
 
-            precomputedNoise = Array(ROWS).fill().map((_, r) => 
-                Array(COLS).fill().map((_, c) => {
+            precomputedNoise = new Float32Array(SIZE);
+            precomputedSparkle = new Float32Array(SIZE);
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const i = r * COLS + c;
                     let u = Math.sin(r * 12.9898 + c * 78.233) * 43758.5453;
-                    return (u - Math.floor(u)) * 14 - 7;
-                })
-            );
-
-            precomputedSparkle = Array(ROWS).fill().map((_, r) => 
-                Array(COLS).fill().map((_, c) => {
-                    return Math.abs((Math.sin(c * 123.4 + r * 567.8) * 9999) % 1);
-                })
-            );
+                    precomputedNoise[i] = (u - Math.floor(u)) * 14 - 7;
+                    precomputedSparkle[i] = Math.abs((Math.sin(c * 123.4 + r * 567.8) * 9999) % 1);
+                }
+            }
         }
 
         const rgbPatches = {
@@ -403,34 +410,27 @@
         let frameCount = 0;
         const fpsEl = document.getElementById('fps-counter');
 
-        function isWall(r, c) {
-            return false;
-        }
-
         function initBubbles() {
-            for(let r=0; r<ROWS; r++) {
-                for(let c=0; c<COLS; c++) {
-                    if(grid[r][c] === 1) grid[r][c] = 0;
-                }
+            const size = ROWS * COLS;
+            for (let i = 0; i < size; i++) {
+                if (grid[i] === 1) grid[i] = 0;
             }
             syncGridObstacles();
         }
 
         function syncGridObstacles() {
             const numBubbles = parseInt(document.getElementById('bubbleCount').value) || 0;
-            for(let i=0; i<numBubbles; i++) {
+            for (let i = 0; i < numBubbles; i++) {
                 let bx = Math.floor(COLS * 0.05 + Math.random() * (COLS * 0.9));
                 let by = Math.floor(ROWS * 0.22 + Math.random() * (ROWS * 0.12));
-                
-                let br = Math.floor((4 + Math.random() * 5) / SCALE); 
-                br = Math.max(1, br);
-                
-                for(let r = Math.max(0, by-br); r <= Math.min(ROWS-1, by+br); r++) {
-                    for(let c = Math.max(0, bx-br); c <= Math.min(COLS-1, bx+br); c++) {
-                        if((c-bx)*(c-bx) + (r-by)*(r-by) <= br*br) {
-                            if(grid[r][c] === 0 && !isWall(r, c)) {
-                                grid[r][c] = 1;
-                            }
+                let br = Math.max(1, Math.floor((4 + Math.random() * 5) / SCALE));
+                const rMin = Math.max(0, by - br), rMax = Math.min(ROWS - 1, by + br);
+                const cMin = Math.max(0, bx - br), cMax = Math.min(COLS - 1, bx + br);
+                for (let r = rMin; r <= rMax; r++) {
+                    for (let c = cMin; c <= cMax; c++) {
+                        if ((c-bx)*(c-bx) + (r-by)*(r-by) <= br*br) {
+                            const idx = r * COLS + c;
+                            if (grid[idx] === 0) grid[idx] = 1;
                         }
                     }
                 }
@@ -438,235 +438,191 @@
         }
 
         function initSand() {
-            const sandRows = Math.floor(ROWS * 0.225); 
-            for(let r=0; r<sandRows; r++) { 
-                for(let c=0; c<COLS; c++) {
-                    if(Math.random() < 0.9) {
+            const sandRows = Math.floor(ROWS * 0.225);
+            for (let r = 0; r < sandRows; r++) {
+                const base = r * COLS;
+                for (let c = 0; c < COLS; c++) {
+                    if (Math.random() < 0.9) {
                         const rand = Math.random();
-                        if(rand < 0.25) grid[r][c] = 2;
-                        else if(rand < 0.50) grid[r][c] = 3;
-                        else if(rand < 0.80) grid[r][c] = 4;
-                        else grid[r][c] = 5;
+                        grid[base + c] = rand < 0.25 ? 2 : rand < 0.50 ? 3 : rand < 0.80 ? 4 : 5;
                     }
                 }
             }
         }
 
-        function countNeighbors(r, c, type) {
+        function countNeighbors(r, c) {
             let count = 0;
-            for (let dr = -1; dr <= 1; dr++) {
-                for (let dc = -1; dc <= 1; dc++) {
-                    if (dr === 0 && dc === 0) continue;
-                    let nr = r + dr;
-                    let nc = c + dc;
-                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
-                        if (grid[nr][nc] === type) count++;
-                    }
-                }
+            const base = r * COLS + c;
+            if (r > 0) {
+                if (c > 0 && grid[base - COLS - 1] === 1) count++;
+                if (grid[base - COLS] === 1) count++;
+                if (c < COLS - 1 && grid[base - COLS + 1] === 1) count++;
+            }
+            if (c > 0 && grid[base - 1] === 1) count++;
+            if (c < COLS - 1 && grid[base + 1] === 1) count++;
+            if (r < ROWS - 1) {
+                if (c > 0 && grid[base + COLS - 1] === 1) count++;
+                if (grid[base + COLS] === 1) count++;
+                if (c < COLS - 1 && grid[base + COLS + 1] === 1) count++;
             }
             return count;
         }
 
+        const BUBBLE_DIRS = [
+            {dr: -1, dc: 0, weight: 3.0},
+            {dr: -1, dc: -1, weight: 2.0},
+            {dr: -1, dc: 1, weight: 2.0},
+            {dr: 0, dc: -1, weight: 1.0},
+            {dr: 0, dc: 1, weight: 1.0},
+            {dr: 1, dc: -1, weight: 0.5},
+            {dr: 1, dc: 1, weight: 0.5}
+        ];
+
         let flipX = false;
         function update() {
-            let moved = Array(ROWS).fill().map(() => Array(COLS).fill(false));
+            moved.fill(0);
             flipX = !flipX;
 
             for (let r = ROWS - 1; r >= 0; r--) {
+                const rOff = r * COLS;
+                const r1Off = (r + 1) * COLS;
                 for (let i = 0; i < COLS; i++) {
-                    let c = flipX ? i : (COLS - 1 - i);
-                    
-                    if (moved[r][c] || isWall(r, c)) continue;
-                    let type = grid[r][c];
-                    
+                    const c = flipX ? i : (COLS - 1 - i);
+                    const rc = rOff + c;
+
+                    if (moved[rc]) continue;
+                    const type = grid[rc];
+
                     if (type >= 2) {
-                        let hasUpperSand = (r > 0 && grid[r - 1][c] >= 2);
+                        const hasUpperSand = (r > 0 && grid[rOff - COLS + c] >= 2);
                         let moveChance = hasUpperSand ? 0.9 : 0.25;
-                        
+
                         if (weightDifferenceEnabled) {
-                            if (type === 2) moveChance = hasUpperSand ? 0.98 : 0.40;      
-                            else if (type === 4) moveChance = hasUpperSand ? 0.90 : 0.25; 
-                            else if (type === 5) moveChance = hasUpperSand ? 0.82 : 0.20; 
-                            else if (type === 3) moveChance = hasUpperSand ? 0.60 : 0.08; 
+                            if (type === 2) moveChance = hasUpperSand ? 0.98 : 0.40;
+                            else if (type === 4) moveChance = hasUpperSand ? 0.90 : 0.25;
+                            else if (type === 5) moveChance = hasUpperSand ? 0.82 : 0.20;
+                            else if (type === 3) moveChance = hasUpperSand ? 0.60 : 0.08;
                         }
 
                         if (Math.random() > moveChance) continue;
 
-                        let tilted = false;
                         if (tiltEnabled && Math.abs(tiltX) > 0.15 && Math.random() < Math.abs(tiltX) * 0.85) {
-                            let dir = tiltX > 0 ? 1 : -1;
-                            let targetC = c + dir;
-                            if (r + 1 < ROWS && targetC >= 0 && targetC < COLS && !isWall(r + 1, targetC)) {
-                                let target = grid[r + 1][targetC];
+                            const dir = tiltX > 0 ? 1 : -1;
+                            const targetC = c + dir;
+                            if (r + 1 < ROWS && targetC >= 0 && targetC < COLS) {
+                                const r1tc = r1Off + targetC;
+                                const target = grid[r1tc];
                                 if (target === 0) {
-                                    grid[r + 1][targetC] = type;
-                                    grid[r][c] = 0;
-                                    moved[r + 1][targetC] = true;
-                                    tilted = true;
-                                } else if (target === 1) {
-                                    let breakthroughChance = hasUpperSand ? 0.012 : 0.002;
-                                    if (Math.random() < breakthroughChance) {
-                                        grid[r + 1][targetC] = type;
-                                        grid[r][c] = 1;
-                                        moved[r + 1][targetC] = true;
-                                        moved[r][c] = true;
-                                        tilted = true;
-                                    }
-                                }
-                            }
-                        }
-
-                        if (tilted) continue; 
-
-                        if (r + 1 < ROWS && !isWall(r + 1, c)) {
-                            let target = grid[r + 1][c];
-                            if (target === 0) {
-                                grid[r + 1][c] = type;
-                                grid[r][c] = 0;
-                                moved[r + 1][c] = true;
-                                continue;
-                            } else if (target === 1) {
-                                let breakthroughChance = hasUpperSand ? 0.012 : 0.002;
-                                if (Math.random() < breakthroughChance) {
-                                    grid[r + 1][c] = type;
-                                    grid[r][c] = 1;
-                                    moved[r + 1][c] = true;
-                                    moved[r][c] = true;
+                                    grid[r1tc] = type; grid[rc] = 0; moved[r1tc] = 1;
+                                    continue;
+                                } else if (target === 1 && Math.random() < (hasUpperSand ? 0.012 : 0.002)) {
+                                    grid[r1tc] = type; grid[rc] = 1; moved[r1tc] = 1; moved[rc] = 1;
                                     continue;
                                 }
                             }
                         }
 
                         if (r + 1 < ROWS) {
+                            const r1c = r1Off + c;
+                            const target = grid[r1c];
+                            if (target === 0) {
+                                grid[r1c] = type; grid[rc] = 0; moved[r1c] = 1;
+                                continue;
+                            } else if (target === 1 && Math.random() < (hasUpperSand ? 0.012 : 0.002)) {
+                                grid[r1c] = type; grid[rc] = 1; moved[r1c] = 1; moved[rc] = 1;
+                                continue;
+                            }
+
                             if (Math.random() > 0.2) continue;
 
-                            let leftC = c - 1;
-                            let rightC = c + 1;
-                            let leftEmpty = (leftC >= 0 && !isWall(r + 1, leftC) && (grid[r + 1][leftC] === 0 || (grid[r + 1][leftC] === 1 && Math.random() < 0.002)));
-                            let rightEmpty = (rightC < COLS && !isWall(r + 1, rightC) && (grid[r + 1][rightC] === 0 || (grid[r + 1][rightC] === 1 && Math.random() < 0.002)));
+                            const leftC = c - 1, rightC = c + 1;
+                            const gl = leftC >= 0 ? grid[r1Off + leftC] : -1;
+                            const gr = rightC < COLS ? grid[r1Off + rightC] : -1;
+                            const leftEmpty  = gl === 0 || (gl === 1 && Math.random() < 0.002);
+                            const rightEmpty = gr === 0 || (gr === 1 && Math.random() < 0.002);
 
                             if (leftEmpty && rightEmpty) {
                                 let dir = Math.random() < 0.5 ? -1 : 1;
-                                if (tiltEnabled && Math.abs(tiltX) > 0.1) {
-                                    dir = tiltX > 0 ? 1 : -1;
-                                }
-                                let targetC = c + dir;
-                                let targetType = grid[r + 1][targetC];
-                                grid[r + 1][targetC] = type;
-                                grid[r][c] = targetType;
-                                moved[r + 1][targetC] = true;
-                                if (targetType === 1) moved[r][c] = true;
+                                if (tiltEnabled && Math.abs(tiltX) > 0.1) dir = tiltX > 0 ? 1 : -1;
+                                const tc = c + dir;
+                                const r1tc = r1Off + tc;
+                                const tt = grid[r1tc];
+                                grid[r1tc] = type; grid[rc] = tt; moved[r1tc] = 1;
+                                if (tt === 1) moved[rc] = 1;
                             } else if (leftEmpty) {
-                                let targetType = grid[r + 1][leftC];
-                                grid[r + 1][leftC] = type;
-                                grid[r][c] = targetType;
-                                moved[r + 1][leftC] = true;
-                                if (targetType === 1) moved[r][c] = true;
+                                const r1lc = r1Off + leftC;
+                                const tt = grid[r1lc];
+                                grid[r1lc] = type; grid[rc] = tt; moved[r1lc] = 1;
+                                if (tt === 1) moved[rc] = 1;
                             } else if (rightEmpty) {
-                                let targetType = grid[r + 1][rightC];
-                                grid[r + 1][rightC] = type;
-                                grid[r][c] = targetType;
-                                moved[r + 1][rightC] = true;
-                                if (targetType === 1) moved[r][c] = true;
+                                const r1rc = r1Off + rightC;
+                                const tt = grid[r1rc];
+                                grid[r1rc] = type; grid[rc] = tt; moved[r1rc] = 1;
+                                if (tt === 1) moved[rc] = 1;
                             }
                         }
-                    }
-                    
-                    else if (type === 1) {
+
+                    } else if (type === 1) {
                         if (Math.random() > 0.6) continue;
 
-                        let candidates = [];
-                        let dirs = [
-                            {dr: -1, dc: 0, weight: 3.0},
-                            {dr: -1, dc: -1, weight: 2.0},
-                            {dr: -1, dc: 1, weight: 2.0},
-                            {dr: 0, dc: -1, weight: 1.0},
-                            {dr: 0, dc: 1, weight: 1.0},
-                            {dr: 1, dc: -1, weight: 0.5},
-                            {dr: 1, dc: 1, weight: 0.5}
-                        ];
-
-                        for (let d of dirs) {
-                            let nr = r + d.dr;
-                            let nc = c + d.dc;
-                            if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && !moved[nr][nc]) {
-                                if (grid[nr][nc] === 0) {
-                                    let airScore = countNeighbors(nr, nc, 1);
-                                    let totalScore = d.weight + airScore * 1.5;
-                                    candidates.push({r: nr, c: nc, score: totalScore});
-                                }
-                            }
+                        let bestIdx = -1, bestScore = -Infinity;
+                        for (let d = 0; d < BUBBLE_DIRS.length; d++) {
+                            const bd = BUBBLE_DIRS[d];
+                            const nr = r + bd.dr, nc = c + bd.dc;
+                            if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+                            const ni = nr * COLS + nc;
+                            if (moved[ni] || grid[ni] !== 0) continue;
+                            const score = bd.weight + countNeighbors(nr, nc) * 1.5 + Math.random() * 0.5;
+                            if (score > bestScore) { bestScore = score; bestIdx = ni; }
                         }
 
-                        if (candidates.length > 0) {
-                            candidates.sort((a, b) => (b.score + Math.random() * 0.5) - (a.score + Math.random() * 0.5));
-                            let best = candidates[0];
-                            
-                            grid[best.r][best.c] = 1;
-                            grid[r][c] = 0;
-                            moved[best.r][best.c] = true;
+                        if (bestIdx >= 0) {
+                            grid[bestIdx] = 1; grid[rc] = 0; moved[bestIdx] = 1;
                         }
                     }
                 }
             }
         }
 
+        const sandThickness = new Int32Array(600);
+
         function draw() {
             const imgData = ctx.createImageData(canvas.width, canvas.height);
             const data = imgData.data;
 
-            // 各列における「砂の累積厚み」を記録する一時配列
-            let sandThickness = new Array(COLS).fill(0);
+            sandThickness.fill(0);
 
             for (let r = 0; r < ROWS; r++) {
+                const rOff = r * COLS;
                 for (let c = 0; c < COLS; c++) {
-                    let type = grid[r][c];
-                    let idx = (r * COLS + c) * 4;
-                    
-                    if (type === 0) {
-                        data[idx]     = 26;
-                        data[idx + 1] = 26;
-                        data[idx + 2] = 46;
-                        data[idx + 3] = 255;
-                        sandThickness[c] = 0; // 空気層は光が通過するため厚みをリセット
-                    }
-                    else if (type === 1) {
-                        data[idx]     = 26;
-                        data[idx + 1] = 26;
-                        data[idx + 2] = 46;
-                        data[idx + 3] = 255;
-                        sandThickness[c] = 0; // 泡（気泡）も光を通すため厚みをリセット
-                    } 
-                    else if (type >= 2) {
-                        let thickness = sandThickness[c];
-                        sandThickness[c]++; // 次の行（さらに深い位置）のために厚みを加算
+                    const gi = rOff + c;
+                    const type = grid[gi];
+                    const idx = gi * 4;
 
-                        let base = rgbPatches[type];
-                        let noise = precomputedNoise[r][c];
-                        
-                        let isSurface = (r > 0 && grid[r - 1][c] < 2);
-                        let isLeftOpen = (c > 0 && grid[r][c - 1] < 2);
-                        let isRightOpen = (c < COLS - 1 && grid[r][c + 1] < 2);
+                    if (type <= 1) {
+                        data[idx]     = 26;
+                        data[idx + 1] = 26;
+                        data[idx + 2] = 46;
+                        data[idx + 3] = 255;
+                        sandThickness[c] = 0;
+                    } else {
+                        const thickness = sandThickness[c]++;
+                        const base = rgbPatches[type];
+                        const noise = precomputedNoise[gi];
+
+                        const isSurface  = r > 0 && grid[gi - COLS] < 2;
+                        const isLeftOpen  = c > 0 && grid[gi - 1] < 2;
+                        const isRightOpen = c < COLS - 1 && grid[gi + 1] < 2;
 
                         let lMod = 0;
-
-                        if (isSurface) lMod += 18 + noise;
-                        if (isLeftOpen) lMod += 10 + noise * 0.5;
+                        if (isSurface)  lMod += 18 + noise;
+                        if (isLeftOpen)  lMod += 10 + noise * 0.5;
                         if (isRightOpen) lMod -= 14 - noise * 0.3;
-                        
-                        if (!isSurface && !isLeftOpen && !isRightOpen) {
-                            lMod -= 6 + noise * 0.1; 
-                        }
-
-                        // 【修正ロジック】真上の砂の累積厚みに応じて、輝度をじんわりとマイルドに減衰（最大値を制限してチラツキを抑制）
+                        if (!isSurface && !isLeftOpen && !isRightOpen) lMod -= 6 + noise * 0.1;
                         lMod -= Math.min(20, thickness * 0.15);
+                        if ((type === 2 || type === 5) && precomputedSparkle[gi] > 0.985) lMod += 28;
 
-                        if (type === 2 || type === 5) {
-                            let sparkle = precomputedSparkle[r][c];
-                            if (sparkle > 0.985) lMod += 28;
-                        }
-
-                        let factor = lMod * 2;
+                        const factor = lMod * 2;
                         data[idx]     = Math.max(0, Math.min(255, base.r + factor));
                         data[idx + 1] = Math.max(0, Math.min(255, base.g + factor));
                         data[idx + 2] = Math.max(0, Math.min(255, base.b + factor));
@@ -711,18 +667,15 @@
         }
 
         function flip() {
-            let newGrid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
-            
+            const newGrid = new Uint8Array(ROWS * COLS);
             for (let r = 0; r < ROWS; r++) {
+                const rOff = r * COLS;
+                const newROff = (ROWS - 1 - r) * COLS;
                 for (let c = 0; c < COLS; c++) {
-                    let type = grid[r][c];
-                    if (type >= 2) {
-                        let newR = ROWS - 1 - r; 
-                        newGrid[newR][c] = type;
-                    }
+                    const type = grid[rOff + c];
+                    if (type >= 2) newGrid[newROff + c] = type;
                 }
             }
-            
             grid = newGrid;
             syncGridObstacles();
         }
@@ -912,6 +865,17 @@
             saveSettings();
         });
 
+        document.getElementById('updateBtn').addEventListener('click', async () => {
+            if ('serviceWorker' in navigator) {
+                const reg = await navigator.serviceWorker.getRegistration();
+                if (reg) {
+                    await reg.update();
+                    if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                }
+            }
+            window.location.reload(true);
+        });
+
         const modal = document.getElementById('settingsModal');
         document.getElementById('openSettingsBtn').addEventListener('click', () => {
             modal.classList.add('active');
@@ -937,6 +901,10 @@
         }
 
         loadSettings();
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js');
+        }
+
         setupSimulation();
         initBubbles();
         initSand();
