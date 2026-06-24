@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sandpicture-v2';
+const CACHE_NAME = 'sandpicture-v3';
 const ASSETS = [
   './',
   './index.html',
