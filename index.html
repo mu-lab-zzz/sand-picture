@@ -585,9 +585,12 @@
         }
 
         const sandThickness = new Int32Array(600);
+        let imgData = null;
 
         function draw() {
-            const imgData = ctx.createImageData(canvas.width, canvas.height);
+            if (!imgData || imgData.width !== canvas.width || imgData.height !== canvas.height) {
+                imgData = ctx.createImageData(canvas.width, canvas.height);
+            }
             const data = imgData.data;
 
             sandThickness.fill(0);
