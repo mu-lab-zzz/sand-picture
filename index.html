@@ -775,12 +775,19 @@
                         if (Math.random() > moveChance) continue;
 
                         if (r + 1 < ROWS) {
-                            const tdir = (tiltEnabled && Math.abs(tiltX) > 0.1) ? (tiltX > 0 ? 1 : -1) : 0;
+                            const tdir = (tiltEnabled && Math.abs(tiltX) > 2) ? (tiltX > 0 ? 1 : -1) : 0;
 
-                            // 移動優先順位: 傾き時は斜め→真下→逆斜め、水平時は真下→左右
-                            const tryOrder = tdir !== 0
-                                ? [[1, tdir], [1, 0], [1, -tdir]]
-                                : [[1, 0]];
+                            // 角度に応じた確率でブレンド: sin(γ)で斜め優先、cos(γ)で真下優先
+                            let tryOrder;
+                            if (tdir !== 0) {
+                                const rad = tiltX * Math.PI / 180;
+                                const diagProb = Math.abs(Math.sin(rad));
+                                tryOrder = Math.random() < diagProb
+                                    ? [[1, tdir], [1, 0], [1, -tdir]]
+                                    : [[1, 0], [1, tdir], [1, -tdir]];
+                            } else {
+                                tryOrder = [[1, 0]];
+                            }
 
                             let moved_flag = false;
                             for (const [dr, dc] of tryOrder) {
@@ -809,6 +816,7 @@
 
                             if (leftEmpty && rightEmpty) {
                                 const dir = tdir !== 0 ? tdir : (Math.random() < 0.5 ? -1 : 1);
+
                                 const tc = c + dir;
                                 const r1tc = r1Off + tc;
                                 const tt = grid[r1tc];
@@ -1007,8 +1015,8 @@
         function handleOrientation(event) {
             let gamma = event.gamma;
             if (gamma !== null) {
-                const raw = Math.max(-1, Math.min(1, gamma / 30));
-                tiltX = isFlipped ? -raw : raw;
+                // 生の角度（度）をそのまま保持、反転時は符号反転
+                tiltX = isFlipped ? -gamma : gamma;
             }
         }
 
