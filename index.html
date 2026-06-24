@@ -505,7 +505,12 @@
                     <button id="updateBtn" style="padding: 6px 12px; min-width: 90px;">更新する</button>
                 </div>
             </div>
-            <div class="modal-actions">
+            <div class="modal-actions" style="flex-direction:column; gap:8px;">
+                <div style="display:flex; gap:8px; width:100%;">
+                    <button class="close-btn" id="backupExportBtn" style="flex:1; font-size:10px;">バックアップ保存</button>
+                    <button class="close-btn" id="backupImportBtn" style="flex:1; font-size:10px;">バックアップ復元</button>
+                    <input type="file" id="backupFileInput" accept=".json" style="display:none;">
+                </div>
                 <button class="close-btn" id="closeSettingsBtn">設定を閉じる</button>
             </div>
             <p style="text-align:center; margin:12px 0 0; font-size:11px; color:#5c4a3e; letter-spacing:1px;">Ver 1.00</p>
@@ -1154,6 +1159,49 @@
         });
         document.getElementById('closeSettingsBtn').addEventListener('click', () => {
             modal.classList.remove('active');
+        });
+
+        // バックアップ保存
+        document.getElementById('backupExportBtn').addEventListener('click', () => {
+            const data = {
+                settings:   localStorage.getItem('sandpicture_settings'),
+                coins:      localStorage.getItem('sandpicture_coins'),
+                ad:         localStorage.getItem('sandpicture_ad'),
+                ownedSands: localStorage.getItem('sandpicture_owned_sands'),
+                activeSand: localStorage.getItem('sandpicture_active_sand'),
+                exportedAt: new Date().toISOString()
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `sandpicture_backup_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+        });
+
+        // バックアップ復元
+        document.getElementById('backupImportBtn').addEventListener('click', () => {
+            document.getElementById('backupFileInput').click();
+        });
+        document.getElementById('backupFileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    if (data.settings)   localStorage.setItem('sandpicture_settings',      data.settings);
+                    if (data.coins)      localStorage.setItem('sandpicture_coins',          data.coins);
+                    if (data.ad)         localStorage.setItem('sandpicture_ad',             data.ad);
+                    if (data.ownedSands) localStorage.setItem('sandpicture_owned_sands',   data.ownedSands);
+                    if (data.activeSand) localStorage.setItem('sandpicture_active_sand',   data.activeSand);
+                    alert('復元しました。再読み込みします。');
+                    location.reload();
+                } catch {
+                    alert('ファイルが正しくありません。');
+                }
+            };
+            reader.readAsText(file);
+            e.target.value = '';
         });
         modal.addEventListener('click', (e) => {
             if (e.target === modal) modal.classList.remove('active');
