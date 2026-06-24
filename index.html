@@ -120,7 +120,9 @@
         .fc {
             background: transparent;
             border: none;
-            box-shadow: none;
+            border-right: 1px solid rgba(0,0,0,0.25);
+            box-shadow: 1px 0 0 rgba(180,120,50,0.08);
+
             color: #1e0c04;
             text-shadow: 0 1px 1px rgba(180,120,50,0.28), 0 -1px 0 rgba(0,0,0,0.35);
             font-size: 9px;
@@ -145,6 +147,10 @@
             text-shadow: 0 0px 1px rgba(180,120,50,0.15), 0 0 0 rgba(0,0,0,0.2);
             opacity: 0.6;
             transform: none;
+        }
+        .fc:last-child {
+            border-right: none;
+            box-shadow: none;
         }
         .fc:disabled {
             opacity: 0.2;
