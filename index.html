@@ -20,20 +20,49 @@
             margin: 0;
             overflow: hidden;
         }
-        h1 {
-            font-size: 1.5rem;
-            margin-bottom: 15px;
-            letter-spacing: 3px;
-            color: #d4af37;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
         #canvas-container {
-            border: 12px solid #2c1d11;
-            border-radius: 8px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.7);
-            background: #1a1a2e;
-            padding: 0;
+            border-radius: 10px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 4px 12px rgba(0,0,0,0.5);
+            padding: 26px 18px 18px;
             position: relative;
+            background:
+                repeating-linear-gradient(
+                    90deg,
+                    transparent 0, transparent 5px,
+                    rgba(0,0,0,0.012) 5px, rgba(0,0,0,0.012) 6px
+                ),
+                repeating-linear-gradient(
+                    87deg,
+                    transparent 0, transparent 18px,
+                    rgba(255,255,255,0.01) 18px, rgba(255,255,255,0.01) 19px
+                ),
+                repeating-linear-gradient(
+                    93deg,
+                    transparent 0, transparent 30px,
+                    rgba(0,0,0,0.018) 30px, rgba(0,0,0,0.018) 32px
+                ),
+                linear-gradient(
+                    160deg,
+                    #5a3418 0%, #3a2010 20%, #6b4020 38%,
+                    #2e1808 52%, #523018 68%, #3a2010 82%, #5a3418 100%
+                );
+        }
+        #frame-title {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 26px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            letter-spacing: 5px;
+            font-weight: 600;
+            color: #1e0c04;
+            text-shadow: 0 1px 1px rgba(180,120,50,0.3), 0 -1px 0 rgba(0,0,0,0.4);
+            pointer-events: none;
+            z-index: 5;
         }
         canvas {
             display: block;
@@ -343,9 +372,9 @@
 </head>
 <body>
 
-    <h1>SAND PICTURE</h1>
     <div id="coin-display">🪙 <span id="coin-count">0</span> コイン</div>
     <div id="canvas-container">
+        <div id="frame-title">SAND PICTURE</div>
         <div id="fps-counter">FPS: --</div>
         <canvas id="sandCanvas"></canvas>
     </div>
