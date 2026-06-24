@@ -239,11 +239,107 @@
             background: linear-gradient(135deg, #6e594b, #5c4a3e);
             border-color: #d4af37;
         }
+
+        /* コイン表示 */
+        #coin-display {
+            font-size: 13px;
+            color: #d4af37;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        #coin-display span {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        /* ストアモーダル */
+        .store-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 14px;
+        }
+        .store-tab {
+            flex: 1;
+            background: #1a1512;
+            color: #776e65;
+            border: 1px solid #3a2e26;
+            padding: 6px 2px;
+            font-size: 11px;
+            border-radius: 4px;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: all 0.2s;
+        }
+        .store-tab.active {
+            background: #3a2e26;
+            color: #d4af37;
+            border-color: #d4af37;
+        }
+        .store-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            min-height: 140px;
+        }
+        .store-item {
+            background: #1a1512;
+            border: 1px solid #3a2e26;
+            border-radius: 6px;
+            padding: 10px 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            font-size: 10px;
+            color: #5c4a3e;
+            letter-spacing: 0.5px;
+        }
+        .store-item .item-icon {
+            font-size: 22px;
+            filter: grayscale(1) opacity(0.3);
+        }
+        .store-item .item-price {
+            color: #776e65;
+            font-size: 10px;
+        }
+
+        /* 広告モーダル */
+        #ad-placeholder {
+            background: #0a0808;
+            border: 1px dashed #3a2e26;
+            border-radius: 8px;
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #5c4a3e;
+            font-size: 12px;
+            gap: 10px;
+            margin-bottom: 16px;
+            letter-spacing: 1px;
+        }
+        #ad-countdown {
+            font-size: 32px;
+            font-weight: bold;
+            color: #d4af37;
+        }
+        #ad-reward-msg {
+            font-size: 14px;
+            color: #d4af37;
+            text-align: center;
+            letter-spacing: 1px;
+            display: none;
+        }
     </style>
 </head>
 <body>
 
     <h1>SAND PICTURE</h1>
+    <div id="coin-display">🪙 <span id="coin-count">0</span> コイン</div>
     <div id="canvas-container">
         <div id="fps-counter">FPS: --</div>
         <canvas id="sandCanvas"></canvas>
@@ -253,6 +349,8 @@
         <button id="flipBtn">上下をひっくり返す</button>
         <button id="resetBtn">泡を再配置</button>
         <button id="openSettingsBtn">演出設定 ⚙️</button>
+        <button id="adBtn">広告を見る（残り3回）</button>
+        <button id="openStoreBtn">ストア 🏪</button>
     </div>
     
     <div class="info">
@@ -300,6 +398,41 @@
                 <button class="close-btn" id="closeSettingsBtn">設定を閉じる</button>
             </div>
             <p style="text-align:center; margin:12px 0 0; font-size:11px; color:#5c4a3e; letter-spacing:1px;">Ver 1.00</p>
+        </div>
+    </div>
+
+    <!-- 広告モーダル -->
+    <div class="modal-overlay" id="adModal">
+        <div class="modal-wrapper">
+            <h2 class="modal-title">広告</h2>
+            <div id="ad-placeholder">
+                <div style="font-size:11px;">広告スペース</div>
+                <div id="ad-countdown">5</div>
+            </div>
+            <div id="ad-reward-msg">🪙 ＋5コイン獲得！</div>
+            <div class="modal-actions">
+                <button class="close-btn" id="adCloseBtn" disabled>しばらくお待ちください</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ストアモーダル -->
+    <div class="modal-overlay" id="storeModal">
+        <div class="modal-wrapper" style="max-width:360px;">
+            <h2 class="modal-title" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>STORE</span>
+                <span style="font-size:13px;letter-spacing:1px;">🪙 <span id="store-coin-count">0</span></span>
+            </h2>
+            <div class="store-tabs">
+                <button class="store-tab active" data-tab="sand">砂の色</button>
+                <button class="store-tab" data-tab="bg">壁紙</button>
+                <button class="store-tab" data-tab="tank">水槽</button>
+                <button class="store-tab" data-tab="bgm">BGM</button>
+            </div>
+            <div class="store-grid" id="store-grid"></div>
+            <div class="modal-actions" style="margin-top:16px;">
+                <button class="close-btn" id="closeStoreBtn">閉じる</button>
+            </div>
         </div>
     </div>
 
@@ -903,6 +1036,144 @@
             document.getElementById('fpsToggleBtn').textContent = fpsVisible ? "FPS: ON" : "FPS: OFF";
             fpsEl.style.display = fpsVisible ? '' : 'none';
         }
+
+        // ── コイン・広告システム ──────────────────────────
+        const COIN_KEY  = 'sandpicture_coins';
+        const AD_KEY    = 'sandpicture_ad';
+        const AD_LIMIT  = 3;
+        const AD_REWARD = 5;
+
+        function getToday() { return new Date().toISOString().slice(0, 10); }
+
+        function loadCoins() {
+            return parseInt(localStorage.getItem(COIN_KEY) || '0');
+        }
+        function saveCoins(n) {
+            localStorage.setItem(COIN_KEY, String(n));
+            document.getElementById('coin-count').textContent = n;
+            document.getElementById('store-coin-count').textContent = n;
+        }
+
+        function loadAdState() {
+            try {
+                const s = JSON.parse(localStorage.getItem(AD_KEY) || '{}');
+                if (s.date !== getToday()) return { date: getToday(), count: 0 };
+                return s;
+            } catch(e) { return { date: getToday(), count: 0 }; }
+        }
+        function saveAdState(s) { localStorage.setItem(AD_KEY, JSON.stringify(s)); }
+
+        function updateAdBtn() {
+            const adState = loadAdState();
+            const remaining = AD_LIMIT - adState.count;
+            const btn = document.getElementById('adBtn');
+            btn.textContent = `広告を見る（残り${remaining}回）`;
+            btn.disabled = remaining <= 0;
+            btn.style.opacity = remaining <= 0 ? '0.4' : '';
+        }
+
+        // 広告モーダル
+        const adModal = document.getElementById('adModal');
+        document.getElementById('adBtn').addEventListener('click', () => {
+            const adState = loadAdState();
+            if (adState.count >= AD_LIMIT) return;
+
+            adModal.classList.add('active');
+            const countdownEl = document.getElementById('ad-countdown');
+            const closeBtn    = document.getElementById('adCloseBtn');
+            const rewardMsg   = document.getElementById('ad-reward-msg');
+            const adBox       = document.getElementById('ad-placeholder');
+
+            closeBtn.disabled = true;
+            closeBtn.textContent = 'しばらくお待ちください';
+            rewardMsg.style.display = 'none';
+            adBox.style.display = 'flex';
+            countdownEl.textContent = '5';
+
+            // ここに広告SDK呼び出しを実装予定
+            let sec = 5;
+            const timer = setInterval(() => {
+                sec--;
+                countdownEl.textContent = sec;
+                if (sec <= 0) {
+                    clearInterval(timer);
+                    adBox.style.display = 'none';
+                    rewardMsg.style.display = 'block';
+                    closeBtn.disabled = false;
+                    closeBtn.textContent = '受け取る';
+
+                    adState.count++;
+                    saveAdState(adState);
+                    saveCoins(loadCoins() + AD_REWARD);
+                    updateAdBtn();
+                }
+            }, 1000);
+
+            closeBtn.onclick = () => {
+                clearInterval(timer);
+                adModal.classList.remove('active');
+                closeBtn.onclick = null;
+            };
+        });
+        adModal.addEventListener('click', e => { if (e.target === adModal) adModal.classList.remove('active'); });
+
+        // ストアデータ
+        const STORE_ITEMS = {
+            sand: [
+                { name: '砂漠の金砂', icon: '🏜️', price: 30 },
+                { name: '深海の砂', icon: '🌊', price: 30 },
+                { name: '桜色の砂', icon: '🌸', price: 50 },
+                { name: '夜光の砂', icon: '✨', price: 80 },
+            ],
+            bg: [
+                { name: '宇宙', icon: '🌌', price: 50 },
+                { name: '深海', icon: '🐠', price: 50 },
+                { name: '夕暮れ', icon: '🌅', price: 50 },
+            ],
+            tank: [
+                { name: '竹枠', icon: '🎋', price: 40 },
+                { name: '金縁', icon: '🖼️', price: 60 },
+                { name: '丸型', icon: '⭕', price: 80 },
+            ],
+            bgm: [
+                { name: '瞑想', icon: '🎵', price: 40 },
+                { name: '波音', icon: '🌊', price: 40 },
+                { name: '雨音', icon: '🌧️', price: 40 },
+            ],
+        };
+
+        function renderStore(tab) {
+            const grid = document.getElementById('store-grid');
+            grid.innerHTML = STORE_ITEMS[tab].map(item => `
+                <div class="store-item">
+                    <div class="item-icon">${item.icon}</div>
+                    <div>${item.name}</div>
+                    <div class="item-price">🪙 ${item.price}</div>
+                </div>
+            `).join('');
+        }
+
+        const storeModal = document.getElementById('storeModal');
+        document.getElementById('openStoreBtn').addEventListener('click', () => {
+            saveCoins(loadCoins());
+            renderStore('sand');
+            storeModal.classList.add('active');
+        });
+        document.getElementById('closeStoreBtn').addEventListener('click', () => storeModal.classList.remove('active'));
+        storeModal.addEventListener('click', e => { if (e.target === storeModal) storeModal.classList.remove('active'); });
+
+        document.querySelectorAll('.store-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.store-tab').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                renderStore(btn.dataset.tab);
+            });
+        });
+
+        // 初期化
+        saveCoins(loadCoins());
+        updateAdBtn();
+        // ─────────────────────────────────────────────────
 
         loadSettings();
         if ('serviceWorker' in navigator) {
