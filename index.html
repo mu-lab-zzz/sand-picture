@@ -774,33 +774,31 @@
 
                         if (Math.random() > moveChance) continue;
 
-                        if (tiltEnabled && Math.abs(tiltX) > 0.15 && Math.random() < Math.abs(tiltX) * 0.85) {
-                            const dir = tiltX > 0 ? 1 : -1;
-                            const targetC = c + dir;
-                            if (r + 1 < ROWS && targetC >= 0 && targetC < COLS) {
-                                const r1tc = r1Off + targetC;
-                                const target = grid[r1tc];
-                                if (target === 0) {
-                                    grid[r1tc] = type; grid[rc] = 0; moved[r1tc] = 1;
-                                    continue;
-                                } else if (target === 1 && Math.random() < (hasUpperSand ? 0.012 : 0.002)) {
-                                    grid[r1tc] = type; grid[rc] = 1; moved[r1tc] = 1; moved[rc] = 1;
-                                    continue;
+                        if (r + 1 < ROWS) {
+                            const tdir = (tiltEnabled && Math.abs(tiltX) > 0.1) ? (tiltX > 0 ? 1 : -1) : 0;
+
+                            // 移動優先順位: 傾き時は斜め→真下→逆斜め、水平時は真下→左右
+                            const tryOrder = tdir !== 0
+                                ? [[1, tdir], [1, 0], [1, -tdir]]
+                                : [[1, 0]];
+
+                            let moved_flag = false;
+                            for (const [dr, dc] of tryOrder) {
+                                const nr = r + dr, nc = c + dc;
+                                if (nc < 0 || nc >= COLS) continue;
+                                const nIdx = (r + dr) * COLS + nc;
+                                const t = grid[nIdx];
+                                if (t === 0) {
+                                    grid[nIdx] = type; grid[rc] = 0; moved[nIdx] = 1;
+                                    moved_flag = true; break;
+                                } else if (t === 1 && Math.random() < (hasUpperSand ? 0.012 : 0.002)) {
+                                    grid[nIdx] = type; grid[rc] = 1; moved[nIdx] = 1; moved[rc] = 1;
+                                    moved_flag = true; break;
                                 }
                             }
-                        }
+                            if (moved_flag) continue;
 
-                        if (r + 1 < ROWS) {
-                            const r1c = r1Off + c;
-                            const target = grid[r1c];
-                            if (target === 0) {
-                                grid[r1c] = type; grid[rc] = 0; moved[r1c] = 1;
-                                continue;
-                            } else if (target === 1 && Math.random() < (hasUpperSand ? 0.012 : 0.002)) {
-                                grid[r1c] = type; grid[rc] = 1; moved[r1c] = 1; moved[rc] = 1;
-                                continue;
-                            }
-
+                            // 水平時の斜め落下（安息角）
                             if (Math.random() > 0.2) continue;
 
                             const leftC = c - 1, rightC = c + 1;
@@ -810,8 +808,7 @@
                             const rightEmpty = gr === 0 || (gr === 1 && Math.random() < 0.002);
 
                             if (leftEmpty && rightEmpty) {
-                                let dir = Math.random() < 0.5 ? -1 : 1;
-                                if (tiltEnabled && Math.abs(tiltX) > 0.1) dir = tiltX > 0 ? 1 : -1;
+                                const dir = tdir !== 0 ? tdir : (Math.random() < 0.5 ? -1 : 1);
                                 const tc = c + dir;
                                 const r1tc = r1Off + tc;
                                 const tt = grid[r1tc];
