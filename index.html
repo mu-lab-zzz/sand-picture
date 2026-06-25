@@ -876,9 +876,35 @@
         function syncGridObstacles() {
             const numBubbles = parseInt(document.getElementById('bubbleCount').value) || 0;
             for (let i = 0; i < numBubbles; i++) {
-                let bx = Math.floor(Math.random() * COLS);
-                let by = Math.floor(ROWS * 0.22 + Math.random() * (ROWS * 0.12));
-                let br = Math.max(1, Math.floor((4 + Math.random() * 5) / SCALE));
+                let bx, by;
+                if (tankShape === 'triangle') {
+                    // 斜辺に沿った帯の中にランダム配置
+                    const stripeWidth = Math.round(ROWS * COLS * 0.12);
+                    const depthMin = stripeWidth, depthMax = stripeWidth * 2;
+                    // 斜辺上のランダム点 + 内側方向にオフセット
+                    let tries = 0;
+                    do {
+                        const t = 0.05 + Math.random() * 0.9;
+                        bx = Math.floor(t * COLS);
+                        by = Math.floor(t * ROWS);
+                        // 深さが目標範囲に入るよう内側へずらす
+                        const depthTarget = depthMin + Math.random() * (depthMax - depthMin);
+                        const L2 = COLS * COLS + ROWS * ROWS;
+                        // 深さ = r*COLS - c*ROWS (normal) / c*ROWS + r*COLS - COLS*ROWS (mirror)
+                        const curDepth = triangleFlipped
+                            ? (bx * ROWS + by * COLS - COLS * ROWS)
+                            : (by * COLS - bx * ROWS);
+                        const delta = depthTarget - curDepth;
+                        bx = Math.round(bx + delta * (-ROWS) / L2 * COLS);
+                        by = Math.round(by + delta * (COLS) / L2 * COLS);
+                        tries++;
+                    } while ((bx < 0 || bx >= COLS || by < 0 || by >= ROWS) && tries < 20);
+                    if (bx < 0 || bx >= COLS || by < 0 || by >= ROWS) continue;
+                } else {
+                    bx = Math.floor(Math.random() * COLS);
+                    by = Math.floor(ROWS * 0.22 + Math.random() * (ROWS * 0.12));
+                }
+                const br = Math.max(1, Math.floor((4 + Math.random() * 5) / SCALE));
                 const rMin = Math.max(0, by - br), rMax = Math.min(ROWS - 1, by + br);
                 const cMin = Math.max(0, bx - br), cMax = Math.min(COLS - 1, bx + br);
                 for (let r = rMin; r <= rMax; r++) {
