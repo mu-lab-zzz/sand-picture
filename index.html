@@ -890,16 +890,18 @@
 
         function initSand() {
             if (tankShape === 'triangle') {
-                // 斜辺に平行な砂面：斜辺からの深さで判定
-                // depth = r*COLS - c*ROWS (0=斜辺上, ROWS*COLS=直角頂点)
-                const maxDepth = ROWS * COLS;
-                const threshold = maxDepth * 0.48; // 下半分を砂に
+                // 斜辺に平行な縞模様で三角形全体に砂と空気を分散配置
+                // depth = r*COLS - c*ROWS (0=斜辺, ROWS*COLS=直角頂点)
+                const stripeWidth = Math.round(ROWS * COLS * 0.12); // 縞幅
                 for (let r = 0; r < ROWS; r++) {
                     for (let c = 0; c < COLS; c++) {
                         const idx = r * COLS + c;
                         if (wallMask && wallMask[idx]) continue;
                         const depth = r * COLS - c * ROWS;
-                        if (depth >= threshold && Math.random() < 0.92) {
+                        // 縞の位相で砂か空気かを決め、端で少しランダムさを加える
+                        const phase = depth % (stripeWidth * 2);
+                        const isSandStripe = phase < stripeWidth;
+                        if (isSandStripe && Math.random() < 0.88) {
                             const rand = Math.random();
                             grid[idx] = rand < 0.25 ? 2 : rand < 0.50 ? 3 : rand < 0.80 ? 4 : 5;
                         }
