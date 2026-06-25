@@ -1094,6 +1094,7 @@
 
         function loop() {
             update();
+            applyInertia();
             draw();
             frameCount++;
 
@@ -1195,6 +1196,8 @@
         let isInteracting = false;
         let lastCanvasX = null;
         let lastCanvasY = null;
+        // 慣性ベクトル
+        let stirVx = 0, stirVy = 0, stirCx = 0, stirCy = 0;
 
         function getCanvasCoords(clientX, clientY) {
             const rect = canvas.getBoundingClientRect();
@@ -1244,11 +1247,51 @@
                             }
                         }
                     }
+
+                    // 慣性ベクトルを更新（スワイプ速度をブレンド）
+                    stirVx = stirVx * 0.4 + vx * 0.6;
+                    stirVy = stirVy * 0.4 + vy * 0.6;
+                    stirCx = canvasX;
+                    stirCy = canvasY;
                 }
             }
 
             lastCanvasX = canvasX;
             lastCanvasY = canvasY;
+        }
+
+        function applyInertia() {
+            const mag = Math.sqrt(stirVx * stirVx + stirVy * stirVy);
+            if (mag < 0.3) { stirVx = 0; stirVy = 0; return; }
+
+            const brushRadius = Math.max(6, Math.floor((10 + mag * 0.5) / SCALE));
+            const prob = Math.min(0.85, mag * 0.08);
+            const moveDist = Math.max(1, Math.round(mag * 0.25));
+
+            for (let r = Math.max(0, stirCy - brushRadius); r <= Math.min(ROWS - 1, stirCy + brushRadius); r++) {
+                for (let c = Math.max(0, stirCx - brushRadius); c <= Math.min(COLS - 1, stirCx + brushRadius); c++) {
+                    if ((c-stirCx)*(c-stirCx) + (r-stirCy)*(r-stirCy) > brushRadius*brushRadius) continue;
+                    if (Math.random() > prob) continue;
+                    const gi = r * COLS + c;
+                    if (grid[gi] === 0 || (wallMask && wallMask[gi])) continue;
+
+                    const dx = Math.round((stirVx / mag) * moveDist) + (Math.floor(Math.random() * 3) - 1);
+                    const dy = Math.round((stirVy / mag) * moveDist) + (Math.floor(Math.random() * 3) - 1);
+                    const nr = r + dy, nc = c + dx;
+                    if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+                    const ni = nr * COLS + nc;
+                    if (wallMask && wallMask[ni]) continue;
+                    if (grid[ni] === 0) {
+                        grid[ni] = grid[gi]; grid[gi] = 0;
+                    } else if (Math.random() < 0.5) {
+                        const tmp = grid[ni]; grid[ni] = grid[gi]; grid[gi] = tmp;
+                    }
+                }
+            }
+
+            // 毎フレーム減衰
+            stirVx *= 0.88;
+            stirVy *= 0.88;
         }
 
         const interactEl = document.getElementById('canvas-ring');
