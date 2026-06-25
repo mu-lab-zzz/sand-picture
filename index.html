@@ -165,6 +165,8 @@
         /* .fc ボタン テーマ色 */
         #canvas-container[data-tank="crystal"]   .fc { color: #5a8098; border-right-color: rgba(60,100,120,0.35); }
         #canvas-container[data-tank="oval"]      .fc { color: #808890; border-right-color: rgba(90,100,110,0.35); }
+        #canvas-container[data-tank="triangle"]  .fc { color: #c8a070; border-right-color: rgba(120,80,20,0.3); }
+        #canvas-container[data-tank="triangle"]  #frame-title { color: #c8a070; }
 
         /* フレーム彫り込みコントロール */
         #frame-controls {
@@ -754,6 +756,10 @@
                         // ROWS===COLS（正方形グリッド）前提
                         const rad = COLS / 2 - 1;
                         inside = (c-cx)*(c-cx) + (r-cy)*(r-cy) <= rad*rad;
+                    } else if (shape === 'triangle') {
+                        // 右上→右下→左下の直角三角形 (右角：右下)
+                        // 斜辺: top-right(COLS,0)→bottom-left(0,ROWS)
+                        inside = (c / COLS + r / ROWS) <= 1.0;
                     } else if (shape === 'oval') {
                         const rx = cx - 1, ry = cy - 1;
                         inside = (c-cx)*(c-cx)/(rx*rx) + (r-cy)*(r-cy)/(ry*ry) <= 1;
@@ -791,28 +797,43 @@
             ring.style.overflow = 'hidden';
 
             // border-radius でフレーム形状を決める
-            const radii = { rect: '0', crystal: '50%', oval: '50%' };
+            const radii = { rect: '0', crystal: '50%', oval: '50%', triangle: '0' };
             ring.style.borderRadius = radii[key] || '0';
 
-            // box-shadow = フレームリング本体
+            // box-shadow = フレームリング本体（triangle は SVG overlay で描く）
             const shadows = {
                 rect:    '',
                 crystal: '0 0 0 3px #6090b0, 0 0 0 9px #18283a, 0 0 0 11px #4a6880, 0 8px 40px rgba(0,0,0,0.9)',
                 oval:    '0 0 0 3px #909aa0, 0 0 0 9px #181c20, 0 0 0 11px #606870, 0 8px 40px rgba(0,0,0,0.9)',
+                triangle: '',
             };
             ring.style.boxShadow = shadows[key] || '';
 
             // canvas-clip の clip-path
+            // triangle: 右上(100%,0)→右下(100%,100%)→左下(0,100%) の直角三角形 角丸付き
+            const triPath = 'path("M 300 38 L 300 372 Q 300 400 272 400 L 38 400 Q 0 400 22 370 L 278 30 Q 300 0 300 38 Z")';
             const clips = {
-                rect:    'none',
-                crystal: 'circle(49.5% at 50% 50%)',
-                oval:    'ellipse(49.5% 49.5% at 50% 50%)',
+                rect:     'none',
+                crystal:  'circle(49.5% at 50% 50%)',
+                oval:     'ellipse(49.5% 49.5% at 50% 50%)',
+                triangle: triPath,
             };
             clip.style.clipPath = clips[key] || 'none';
             clip.style.width    = '100%';
             clip.style.height   = '100%';
 
-            overlay.innerHTML = '';
+            // SVG オーバーレイ（triangle のみ木目フレーム描画）
+            if (key === 'triangle') {
+                const p = 'M 300 38 L 300 372 Q 300 400 272 400 L 38 400 Q 0 400 22 370 L 278 30 Q 300 0 300 38 Z';
+                overlay.innerHTML = `<svg viewBox="0 0 300 400" width="100%" height="100%"
+                    xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;">
+                    <path d="${p}" fill="none" stroke="#1a0e06" stroke-width="18" stroke-linejoin="round"/>
+                    <path d="${p}" fill="none" stroke="#7a5020" stroke-width="4"  stroke-linejoin="round"/>
+                    <path d="${p}" fill="none" stroke="#a07030" stroke-width="1.5" stroke-linejoin="round"/>
+                </svg>`;
+            } else {
+                overlay.innerHTML = '';
+            }
         }
 
         function applyTankShape(key) {
@@ -1506,9 +1527,10 @@
         };
 
         const TANK_SHAPES = {
-            rect:    { name: '長方形',       price: 0,  desc: 'デフォルト' },
-            crystal: { name: 'クリスタル球', price: 30, desc: '細ライン' },
-            oval:    { name: '縦楕円',       price: 30, desc: 'なめらか楕円' },
+            rect:     { name: '長方形',       price: 0,  desc: 'デフォルト' },
+            crystal:  { name: 'クリスタル球', price: 30, desc: '細ライン' },
+            oval:     { name: '縦楕円',       price: 30, desc: 'なめらか楕円' },
+            triangle: { name: '三角形',       price: 30, desc: '角丸直角三角' },
         };
 
         function loadOwnedTanks() {
@@ -1551,7 +1573,7 @@
                         ? `<button data-tank="${key}" data-owned="1">選択</button>`
                         : `<button data-tank="${key}">🪙 ${s.price}</button>`;
                     return `<div class="${cls}">
-                        <div class="item-icon" style="font-size:18px;color:#5c4a3e;">${key==='rect'?'▭':key==='crystal'?'○':'⬭'}</div>
+                        <div class="item-icon" style="font-size:18px;color:#5c4a3e;">${key==='rect'?'▭':key==='crystal'?'○':key==='triangle'?'◺':'⬭'}</div>
                         <div>${s.name}</div>
                         <div style="font-size:9px;color:#5c4a3e;">${s.desc}</div>
                         ${btn}
