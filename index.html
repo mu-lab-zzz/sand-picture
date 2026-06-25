@@ -905,9 +905,7 @@
                             ? (c * ROWS + r * COLS - COLS * ROWS)  // ミラー時
                             : (r * COLS - c * ROWS);
                         // 縞の位相で砂か空気かを決め、端で少しランダムさを加える
-                        const phase = depth % (stripeWidth * 2);
-                        const isSandStripe = phase < stripeWidth;
-                        if (isSandStripe && Math.random() < 0.88) {
+                        if (depth >= 0 && depth < stripeWidth && Math.random() < 0.88) {
                             const rand = Math.random();
                             grid[idx] = rand < 0.25 ? 2 : rand < 0.50 ? 3 : rand < 0.80 ? 4 : 5;
                         }
