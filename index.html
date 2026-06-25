@@ -155,21 +155,16 @@
         }
 
         /* フレームタイトル テーマ色 */
-        #canvas-container[data-tank="porthole"]  #frame-title { color: #b88a20; text-shadow: 0 1px 1px rgba(0,0,0,0.5); }
         #canvas-container[data-tank="crystal"]   #frame-title { color: #5a8098; text-shadow: 0 1px 1px rgba(0,0,0,0.5); }
         #canvas-container[data-tank="oval"]      #frame-title { color: #808890; text-shadow: 0 1px 1px rgba(0,0,0,0.5); }
-        #canvas-container[data-tank="hourglass"] #frame-title { color: #c8a070; }
 
         /* 全画面ボタン テーマ色 */
-        #canvas-container[data-tank="porthole"]  #fullscreenBtn { color: rgba(140,100,20,0.7); }
         #canvas-container[data-tank="crystal"]   #fullscreenBtn { color: rgba(60,100,120,0.7); }
         #canvas-container[data-tank="oval"]      #fullscreenBtn { color: rgba(90,100,110,0.7); }
 
         /* .fc ボタン テーマ色 */
-        #canvas-container[data-tank="porthole"]  .fc { color: #b88a20; border-right-color: rgba(120,80,10,0.35); }
         #canvas-container[data-tank="crystal"]   .fc { color: #5a8098; border-right-color: rgba(60,100,120,0.35); }
         #canvas-container[data-tank="oval"]      .fc { color: #808890; border-right-color: rgba(90,100,110,0.35); }
-        #canvas-container[data-tank="hourglass"] .fc { color: #c8a070; border-right-color: rgba(120,80,20,0.3); }
 
         /* フレーム彫り込みコントロール */
         #frame-controls {
@@ -700,8 +695,12 @@
                 canvas.height = 100;
             }
 
-            canvas.style.width = "300px";
-            canvas.style.height = "400px";
+            // crystal は正方形（座標ずれ防止）
+            if (tankShape === 'crystal') {
+                canvas.height = canvas.width;
+            }
+            canvas.style.width  = "300px";
+            canvas.style.height = tankShape === 'crystal' ? "300px" : "400px";
 
             COLS = canvas.width;
             ROWS = canvas.height;
@@ -751,11 +750,10 @@
             for (let r = 0; r < ROWS; r++) {
                 for (let c = 0; c < COLS; c++) {
                     let inside = false;
-                    if (shape === 'porthole' || shape === 'crystal') {
-                        // 円を左右中心・上から COLS/2 に配置 → 正方形領域に収まる
+                    if (shape === 'crystal') {
+                        // ROWS===COLS（正方形グリッド）前提
                         const rad = COLS / 2 - 1;
-                        const cy2 = COLS / 2;
-                        inside = (c-cx)*(c-cx) + (r-cy2)*(r-cy2) <= rad*rad;
+                        inside = (c-cx)*(c-cx) + (r-cy)*(r-cy) <= rad*rad;
                     } else if (shape === 'oval') {
                         const rx = cx - 1, ry = cy - 1;
                         inside = (c-cx)*(c-cx)/(rx*rx) + (r-cy)*(r-cy)/(ry*ry) <= 1;
@@ -782,101 +780,44 @@
             container.dataset.tank = key;
             canvas.style.clipPath = 'none';
 
-            const isCircle    = key === 'porthole' || key === 'crystal';
-            const isNonRect   = key !== 'rect';
+            const isNonRect = key !== 'rect';
             document.body.classList.toggle('tank-shaped', isNonRect);
 
-            // ポートホール・クリスタルは正方形表示（円がぴったり収まる）
+            // canvas-ring のサイズ（crystal は正方形、oval は縦長）
             const ringW = canvas.style.width  || '300px';
-            const ringH = isCircle ? ringW : (canvas.style.height || '400px');
+            const ringH = canvas.style.height || '400px';
             ring.style.width    = ringW;
             ring.style.height   = ringH;
             ring.style.overflow = 'hidden';
 
-            // 形状ごとの border-radius（ring の形 = フレームの形）
-            const radii = {
-                rect:      '0',
-                porthole:  '50%',
-                crystal:   '50%',
-                oval:      '50%',   // 300×400 に 50% → 楕円フレーム
-                hourglass: '0',
-            };
+            // border-radius でフレーム形状を決める
+            const radii = { rect: '0', crystal: '50%', oval: '50%' };
             ring.style.borderRadius = radii[key] || '0';
 
-            // box-shadow がリング（フレーム）本体
+            // box-shadow = フレームリング本体
             const shadows = {
-                rect:      '',
-                porthole:  '0 0 0 16px #7a5510, 0 0 0 26px #3a2008, 0 0 0 28px #9a7020, 0 10px 60px rgba(0,0,0,0.9)',
-                crystal:   '0 0 0 3px #6090b0, 0 0 0 9px #18283a, 0 0 0 11px #4a6880, 0 8px 40px rgba(0,0,0,0.9)',
-                oval:      '0 0 0 3px #909aa0, 0 0 0 9px #181c20, 0 0 0 11px #606870, 0 8px 40px rgba(0,0,0,0.9)',
-                hourglass: '',
+                rect:    '',
+                crystal: '0 0 0 3px #6090b0, 0 0 0 9px #18283a, 0 0 0 11px #4a6880, 0 8px 40px rgba(0,0,0,0.9)',
+                oval:    '0 0 0 3px #909aa0, 0 0 0 9px #181c20, 0 0 0 11px #606870, 0 8px 40px rgba(0,0,0,0.9)',
             };
             ring.style.boxShadow = shadows[key] || '';
 
-            // canvas-clip の clip-path でガラス面を切り抜き
+            // canvas-clip の clip-path
             const clips = {
-                rect:      'none',
-                porthole:  'circle(49.5% at 50% 50%)',
-                crystal:   'circle(49.5% at 50% 50%)',
-                oval:      'ellipse(49.5% 49.5% at 50% 50%)',
-                hourglass: 'none',
+                rect:    'none',
+                crystal: 'circle(49.5% at 50% 50%)',
+                oval:    'ellipse(49.5% 49.5% at 50% 50%)',
             };
             clip.style.clipPath = clips[key] || 'none';
             clip.style.width    = '100%';
             clip.style.height   = '100%';
 
-            // 長方形フレームのパディングは CSS ではなくここで設定
-            container.style.padding = key === 'rect' ? '' : '';
-
-            // デコレーション SVG オーバーレイ
-            if (key === 'porthole') {
-                // ポートホール：真鍮ボルト（正方形300×300の円に合わせた位置）
-                const R = 150, cx = 150, cy = 150;
-                const angles = [0, 45, 90, 135, 180, 225, 270, 315];
-                const boltR  = R + 0;   // ボルトは円周上
-                const bolts  = angles.map(a => {
-                    const rad = a * Math.PI / 180;
-                    return [Math.round(cx + boltR * Math.sin(rad)),
-                            Math.round(cy - boltR * Math.cos(rad))];
-                });
-                overlay.innerHTML = `<svg viewBox="0 0 300 300" width="100%" height="100%"
-                    xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;">
-                    ${bolts.map(([x,y]) => `
-                        <circle cx="${x}" cy="${y}" r="8" fill="#3a2408" stroke="#b08830" stroke-width="2.5"/>
-                        <circle cx="${x}" cy="${y}" r="3"  fill="#6a4818"/>
-                        <line x1="${x-4}" y1="${y}" x2="${x+4}" y2="${y}" stroke="#2a1808" stroke-width="1.5"/>
-                    `).join('')}
-                </svg>`;
-            } else if (key === 'hourglass') {
-                // 砂時計：上下の球体周囲に木目リング枠（物理マスク位置に合わせ）
-                const tCy = Math.round(400*0.27), bCy = Math.round(400*0.73);
-                const rad = Math.round(400*0.22), nW = Math.max(3, Math.floor(300*0.07));
-                overlay.innerHTML = `<svg viewBox="0 0 300 400" width="100%" height="100%"
-                    xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;">
-                    <!-- 上球 木目リング -->
-                    <circle cx="150" cy="${tCy}" r="${rad+14}" fill="none" stroke="#2a1a08" stroke-width="18"/>
-                    <circle cx="150" cy="${tCy}" r="${rad+5}"  fill="none" stroke="#7a5020" stroke-width="4"/>
-                    <circle cx="150" cy="${tCy}" r="${rad+13}" fill="none" stroke="#a07030" stroke-width="1.5"/>
-                    <!-- 下球 木目リング -->
-                    <circle cx="150" cy="${bCy}" r="${rad+14}" fill="none" stroke="#2a1a08" stroke-width="18"/>
-                    <circle cx="150" cy="${bCy}" r="${rad+5}"  fill="none" stroke="#7a5020" stroke-width="4"/>
-                    <circle cx="150" cy="${bCy}" r="${rad+13}" fill="none" stroke="#a07030" stroke-width="1.5"/>
-                    <!-- 首 木目枠 -->
-                    <rect x="${150-nW-10}" y="${tCy}" width="${(nW+10)*2}" height="${bCy-tCy}"
-                        fill="none" stroke="#2a1a08" stroke-width="18"/>
-                    <rect x="${150-nW-1}"  y="${tCy}" width="${(nW+1)*2}"  height="${bCy-tCy}"
-                        fill="none" stroke="#7a5020" stroke-width="4"/>
-                    <rect x="${150-nW-9}"  y="${tCy}" width="${(nW+9)*2}"  height="${bCy-tCy}"
-                        fill="none" stroke="#a07030" stroke-width="1.5"/>
-                </svg>`;
-            } else {
-                overlay.innerHTML = '';
-            }
+            overlay.innerHTML = '';
         }
 
         function applyTankShape(key) {
             tankShape = key;
-            computeWallMask(key);
+            setupSimulation();   // canvas サイズ再設定 + computeWallMask
             grid.fill(0);
             initBubbles();
             initSand();
@@ -1534,11 +1475,9 @@
         };
 
         const TANK_SHAPES = {
-            rect:      { name: '長方形',       price: 0,  desc: 'デフォルト' },
-            porthole:  { name: 'ポートホール', price: 40, desc: '真鍮リング' },
-            crystal:   { name: 'クリスタル球', price: 30, desc: '細ライン' },
-            hourglass: { name: '砂時計',       price: 60, desc: '上下2球' },
-            oval:      { name: '縦楕円',       price: 30, desc: 'なめらか楕円' },
+            rect:    { name: '長方形',       price: 0,  desc: 'デフォルト' },
+            crystal: { name: 'クリスタル球', price: 30, desc: '細ライン' },
+            oval:    { name: '縦楕円',       price: 30, desc: 'なめらか楕円' },
         };
 
         function loadOwnedTanks() {
@@ -1581,7 +1520,7 @@
                         ? `<button data-tank="${key}" data-owned="1">選択</button>`
                         : `<button data-tank="${key}">🪙 ${s.price}</button>`;
                     return `<div class="${cls}">
-                        <div class="item-icon" style="font-size:18px;color:#5c4a3e;">${key==='rect'?'▭':key==='porthole'?'⊕':key==='crystal'?'○':key==='hourglass'?'⧗':'⬭'}</div>
+                        <div class="item-icon" style="font-size:18px;color:#5c4a3e;">${key==='rect'?'▭':key==='crystal'?'○':'⬭'}</div>
                         <div>${s.name}</div>
                         <div style="font-size:9px;color:#5c4a3e;">${s.desc}</div>
                         ${btn}
