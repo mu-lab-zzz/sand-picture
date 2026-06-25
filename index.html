@@ -758,9 +758,12 @@
                         const rad = COLS / 2 - 1;
                         inside = (c-cx)*(c-cx) + (r-cy)*(r-cy) <= rad*rad;
                     } else if (shape === 'triangle') {
+                        // フレーム幅分（約9px）内側に縮める
+                        const m = Math.round(9 / SCALE);
+                        const L = Math.sqrt(COLS * COLS + ROWS * ROWS);
                         inside = triangleFlipped
-                            ? (c * ROWS + r * COLS <= COLS * ROWS)  // 左上直角（上下反転）
-                            : (r * COLS >= c * ROWS);               // 左下直角
+                            ? (c * ROWS + r * COLS <= COLS * ROWS - m * L && c <= COLS - m && r >= m)
+                            : (r * COLS - c * ROWS >= m * L && c >= m && r <= ROWS - m);
                     } else if (shape === 'oval') {
                         const rx = cx - 1, ry = cy - 1;
                         inside = (c-cx)*(c-cx)/(rx*rx) + (r-cy)*(r-cy)/(ry*ry) <= 1;
