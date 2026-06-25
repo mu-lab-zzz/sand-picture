@@ -1186,13 +1186,12 @@
                     const dstOff = (ROWS - 1 - r) * COLS;
                     for (let c = 0; c < COLS; c++) {
                         const type = grid[srcOff + c];
-                        if (type >= 2 && !(wallMask && wallMask[dstOff + c])) {
+                        if (type > 0 && !(wallMask && wallMask[dstOff + c])) {
                             newGrid[dstOff + c] = type;
                         }
                     }
                 }
                 grid = newGrid;
-                syncGridObstacles();
                 setTankTheme('triangle');
                 return;
             }
