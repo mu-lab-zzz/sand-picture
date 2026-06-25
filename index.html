@@ -887,7 +887,7 @@
                     let tries = 0;
                     do {
                         bx = Math.floor(Math.random() * COLS);
-                        by = Math.floor(ROWS * 0.45 + Math.random() * ROWS * 0.22);
+                        by = Math.floor(ROWS * 0.67 + Math.random() * ROWS * 0.16);
                         tries++;
                     } while (tries < 40 && (wallMask && wallMask[by * COLS + bx]));
                     if (tries >= 40) continue;
@@ -912,7 +912,7 @@
         function initSand() {
             if (tankShape === 'triangle') {
                 // 下1/3の行に砂をびっしり
-                const sandStart = Math.floor(ROWS * 0.67);
+                const sandStart = Math.floor(ROWS * 0.83);
                 for (let r = sandStart; r < ROWS; r++) {
                     for (let c = 0; c < COLS; c++) {
                         const idx = r * COLS + c;
