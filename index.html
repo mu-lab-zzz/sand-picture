@@ -126,10 +126,32 @@
             z-index: 3;
         }
 
-        /* 非長方形：木目フレームを外す */
-        #canvas-container:not([data-tank=""]):not([data-tank="rect"]) {
+        /* 非長方形：コンテナをフレックス列に変え木目を外す */
+        body.tank-shaped #canvas-container {
             background: transparent !important;
             box-shadow: none !important;
+            padding: 2px 0 0 !important;
+            border-radius: 0 !important;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        body.tank-shaped #frame-title {
+            position: static;
+            height: auto;
+            width: 100%;
+            padding: 2px 0;
+        }
+        body.tank-shaped #fullscreenBtn {
+            display: none;
+        }
+        body.tank-shaped #frame-controls {
+            position: static;
+            width: auto;
+            min-width: 180px;
+            border-radius: 3px;
+            overflow: hidden;
         }
 
         /* フレームタイトル テーマ色 */
@@ -730,8 +752,10 @@
                 for (let c = 0; c < COLS; c++) {
                     let inside = false;
                     if (shape === 'porthole' || shape === 'crystal') {
-                        const rad = Math.min(cx, cy) - 1;
-                        inside = (c-cx)*(c-cx) + (r-cy)*(r-cy) <= rad*rad;
+                        // 円を左右中心・上から COLS/2 に配置 → 正方形領域に収まる
+                        const rad = COLS / 2 - 1;
+                        const cy2 = COLS / 2;
+                        inside = (c-cx)*(c-cx) + (r-cy2)*(r-cy2) <= rad*rad;
                     } else if (shape === 'oval') {
                         const rx = cx - 1, ry = cy - 1;
                         inside = (c-cx)*(c-cx)/(rx*rx) + (r-cy)*(r-cy)/(ry*ry) <= 1;
@@ -756,13 +780,35 @@
             const overlay   = document.getElementById('frame-overlay');
 
             container.dataset.tank = key;
+            canvas.style.clipPath = 'none';
 
-            // canvas-ring の box-shadow でリングを表現
+            const isCircle    = key === 'porthole' || key === 'crystal';
+            const isNonRect   = key !== 'rect';
+            document.body.classList.toggle('tank-shaped', isNonRect);
+
+            // ポートホール・クリスタルは正方形表示（円がぴったり収まる）
+            const ringW = canvas.style.width  || '300px';
+            const ringH = isCircle ? ringW : (canvas.style.height || '400px');
+            ring.style.width    = ringW;
+            ring.style.height   = ringH;
+            ring.style.overflow = 'hidden';
+
+            // 形状ごとの border-radius（ring の形 = フレームの形）
+            const radii = {
+                rect:      '0',
+                porthole:  '50%',
+                crystal:   '50%',
+                oval:      '50%',   // 300×400 に 50% → 楕円フレーム
+                hourglass: '0',
+            };
+            ring.style.borderRadius = radii[key] || '0';
+
+            // box-shadow がリング（フレーム）本体
             const shadows = {
                 rect:      '',
-                porthole:  '0 0 0 14px #7a5510, 0 0 0 22px #3a2008, 0 0 0 24px #9a7020, 0 8px 50px rgba(0,0,0,0.9)',
-                crystal:   '0 0 0 2px #4a6880, 0 0 0 6px #18283a, 0 8px 40px rgba(0,0,0,0.9)',
-                oval:      '0 0 0 2px #606870, 0 0 0 6px #181c20, 0 8px 40px rgba(0,0,0,0.9)',
+                porthole:  '0 0 0 16px #7a5510, 0 0 0 26px #3a2008, 0 0 0 28px #9a7020, 0 10px 60px rgba(0,0,0,0.9)',
+                crystal:   '0 0 0 3px #6090b0, 0 0 0 9px #18283a, 0 0 0 11px #4a6880, 0 8px 40px rgba(0,0,0,0.9)',
+                oval:      '0 0 0 3px #909aa0, 0 0 0 9px #181c20, 0 0 0 11px #606870, 0 8px 40px rgba(0,0,0,0.9)',
                 hourglass: '',
             };
             ring.style.boxShadow = shadows[key] || '';
@@ -776,50 +822,52 @@
                 hourglass: 'none',
             };
             clip.style.clipPath = clips[key] || 'none';
-            canvas.style.clipPath = 'none';
+            clip.style.width    = '100%';
+            clip.style.height   = '100%';
 
-            // コンテナの padding 調整（リング分のスペース確保）
-            const pads = {
-                rect:      '26px 18px 50px',
-                porthole:  '26px 30px 50px',
-                crystal:   '26px 22px 50px',
-                oval:      '26px 22px 50px',
-                hourglass: '26px 18px 50px',
-            };
-            container.style.padding = pads[key] || '';
-
-            // frame-ring のサイズ更新（setupSimulation 後に呼ぶため css size 固定）
-            ring.style.width  = canvas.style.width  || '300px';
-            ring.style.height = canvas.style.height || '400px';
+            // 長方形フレームのパディングは CSS ではなくここで設定
+            container.style.padding = key === 'rect' ? '' : '';
 
             // デコレーション SVG オーバーレイ
             if (key === 'porthole') {
-                // ボルト位置（キャンバス 300×400、円中心 150,200、半径 148）
-                const bolts = [
-                    [150,52],[150,348],[2,200],[298,200],
-                    [58,96],[242,96],[58,304],[242,304],
-                ];
-                overlay.innerHTML = `<svg viewBox="0 0 300 400" width="100%" height="100%"
+                // ポートホール：真鍮ボルト（正方形300×300の円に合わせた位置）
+                const R = 150, cx = 150, cy = 150;
+                const angles = [0, 45, 90, 135, 180, 225, 270, 315];
+                const boltR  = R + 0;   // ボルトは円周上
+                const bolts  = angles.map(a => {
+                    const rad = a * Math.PI / 180;
+                    return [Math.round(cx + boltR * Math.sin(rad)),
+                            Math.round(cy - boltR * Math.cos(rad))];
+                });
+                overlay.innerHTML = `<svg viewBox="0 0 300 300" width="100%" height="100%"
                     xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;">
                     ${bolts.map(([x,y]) => `
-                        <circle cx="${x}" cy="${y}" r="7" fill="#3a2408" stroke="#a07828" stroke-width="2"/>
-                        <circle cx="${x}" cy="${y}" r="2.5" fill="#6a4818"/>
-                        <line x1="${x-3}" y1="${y}" x2="${x+3}" y2="${y}" stroke="#2a1808" stroke-width="1.2"/>
+                        <circle cx="${x}" cy="${y}" r="8" fill="#3a2408" stroke="#b08830" stroke-width="2.5"/>
+                        <circle cx="${x}" cy="${y}" r="3"  fill="#6a4818"/>
+                        <line x1="${x-4}" y1="${y}" x2="${x+4}" y2="${y}" stroke="#2a1808" stroke-width="1.5"/>
                     `).join('')}
                 </svg>`;
             } else if (key === 'hourglass') {
-                // 砂時計の木目リング縁取り（物理マスクの境界に合わせて）
-                const tCy=108, bCy=292, rad=88, nW=21;
+                // 砂時計：上下の球体周囲に木目リング枠（物理マスク位置に合わせ）
+                const tCy = Math.round(400*0.27), bCy = Math.round(400*0.73);
+                const rad = Math.round(400*0.22), nW = Math.max(3, Math.floor(300*0.07));
                 overlay.innerHTML = `<svg viewBox="0 0 300 400" width="100%" height="100%"
                     xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;">
-                    <circle cx="150" cy="${tCy}" r="${rad}"   fill="none" stroke="#8a6030" stroke-width="5"/>
-                    <circle cx="150" cy="${tCy}" r="${rad+12}" fill="none" stroke="#3a2410" stroke-width="14"/>
-                    <circle cx="150" cy="${bCy}" r="${rad}"   fill="none" stroke="#8a6030" stroke-width="5"/>
-                    <circle cx="150" cy="${bCy}" r="${rad+12}" fill="none" stroke="#3a2410" stroke-width="14"/>
-                    <rect x="${150-nW-8}" y="${tCy}" width="${(nW+8)*2}" height="${bCy-tCy}"
-                        fill="none" stroke="#3a2410" stroke-width="16"/>
-                    <rect x="${150-nW-3}" y="${tCy}" width="${(nW+3)*2}" height="${bCy-tCy}"
-                        fill="none" stroke="#8a6030" stroke-width="3"/>
+                    <!-- 上球 木目リング -->
+                    <circle cx="150" cy="${tCy}" r="${rad+14}" fill="none" stroke="#2a1a08" stroke-width="18"/>
+                    <circle cx="150" cy="${tCy}" r="${rad+5}"  fill="none" stroke="#7a5020" stroke-width="4"/>
+                    <circle cx="150" cy="${tCy}" r="${rad+13}" fill="none" stroke="#a07030" stroke-width="1.5"/>
+                    <!-- 下球 木目リング -->
+                    <circle cx="150" cy="${bCy}" r="${rad+14}" fill="none" stroke="#2a1a08" stroke-width="18"/>
+                    <circle cx="150" cy="${bCy}" r="${rad+5}"  fill="none" stroke="#7a5020" stroke-width="4"/>
+                    <circle cx="150" cy="${bCy}" r="${rad+13}" fill="none" stroke="#a07030" stroke-width="1.5"/>
+                    <!-- 首 木目枠 -->
+                    <rect x="${150-nW-10}" y="${tCy}" width="${(nW+10)*2}" height="${bCy-tCy}"
+                        fill="none" stroke="#2a1a08" stroke-width="18"/>
+                    <rect x="${150-nW-1}"  y="${tCy}" width="${(nW+1)*2}"  height="${bCy-tCy}"
+                        fill="none" stroke="#7a5020" stroke-width="4"/>
+                    <rect x="${150-nW-9}"  y="${tCy}" width="${(nW+9)*2}"  height="${bCy-tCy}"
+                        fill="none" stroke="#a07030" stroke-width="1.5"/>
                 </svg>`;
             } else {
                 overlay.innerHTML = '';
