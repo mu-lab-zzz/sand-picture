@@ -759,7 +759,7 @@
                         inside = (c-cx)*(c-cx) + (r-cy)*(r-cy) <= rad*rad;
                     } else if (shape === 'triangle') {
                         inside = triangleFlipped
-                            ? (c * ROWS + r * COLS >= COLS * ROWS)  // 右下直角
+                            ? (c * ROWS + r * COLS <= COLS * ROWS)  // 左上直角（上下反転）
                             : (r * COLS >= c * ROWS);               // 左下直角
                     } else if (shape === 'oval') {
                         const rx = cx - 1, ry = cy - 1;
@@ -811,9 +811,11 @@
             ring.style.boxShadow = shadows[key] || '';
 
             // canvas-clip の clip-path
-            const triNormal  = 'path("M 0 35 L 0 370 Q 0 400 30 400 L 265 400 Q 300 400 279 372 L 21 28 Q 0 0 0 35 Z")';
-            const triMirror  = 'path("M 300 35 L 300 370 Q 300 400 270 400 L 35 400 Q 0 400 21 372 L 279 28 Q 300 0 300 35 Z")';
-            const triPath = triangleFlipped ? triMirror : triNormal;
+            // 通常: 左下直角、斜辺が左上→右下
+            // 反転: 左上直角（上下反転）、斜辺が左下→右上
+            const triNormal = 'path("M 0 35 L 0 370 Q 0 400 30 400 L 265 400 Q 300 400 279 372 L 21 28 Q 0 0 0 35 Z")';
+            const triFlip   = 'path("M 30 0 L 270 0 Q 300 0 279 28 L 21 372 Q 0 400 0 370 L 0 30 Q 0 0 30 0 Z")';
+            const triPath = triangleFlipped ? triFlip : triNormal;
             const clips = {
                 rect:     'none',
                 crystal:  'circle(49.5% at 50% 50%)',
@@ -827,7 +829,7 @@
             // SVG オーバーレイ（triangle のみ木目フレーム描画）
             if (key === 'triangle') {
                 const p = triangleFlipped
-                    ? 'M 300 35 L 300 370 Q 300 400 270 400 L 35 400 Q 0 400 21 372 L 279 28 Q 300 0 300 35 Z'
+                    ? 'M 30 0 L 270 0 Q 300 0 279 28 L 21 372 Q 0 400 0 370 L 0 30 Q 0 0 30 0 Z'
                     : 'M 0 35 L 0 370 Q 0 400 30 400 L 265 400 Q 300 400 279 372 L 21 28 Q 0 0 0 35 Z';
                 overlay.innerHTML = `<svg viewBox="0 0 300 400" width="100%" height="100%"
                     xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;">
@@ -880,26 +882,19 @@
                 if (tankShape === 'triangle') {
                     // 斜辺に沿った帯の中にランダム配置
                     const stripeWidth = Math.round(ROWS * COLS * 0.12);
-                    const depthMin = 0, depthMax = stripeWidth;
-                    // 斜辺上のランダム点 + 内側方向にオフセット
+                    // 斜辺に沿ったバンド内にランダム配置（rejection sampling）
                     let tries = 0;
                     do {
                         const t = 0.05 + Math.random() * 0.9;
                         bx = Math.floor(t * COLS);
                         by = Math.floor(t * ROWS);
-                        // 深さが目標範囲に入るよう内側へずらす
-                        const depthTarget = depthMin + Math.random() * (depthMax - depthMin);
-                        const L2 = COLS * COLS + ROWS * ROWS;
-                        // 深さ = r*COLS - c*ROWS (normal) / c*ROWS + r*COLS - COLS*ROWS (mirror)
-                        const curDepth = triangleFlipped
-                            ? (bx * ROWS + by * COLS - COLS * ROWS)
+                        const depth = triangleFlipped
+                            ? (COLS * ROWS - bx * ROWS - by * COLS)
                             : (by * COLS - bx * ROWS);
-                        const delta = depthTarget - curDepth;
-                        bx = Math.round(bx + delta * (-ROWS) / L2 * COLS);
-                        by = Math.round(by + delta * (COLS) / L2 * COLS);
+                        if (depth >= 0 && depth < stripeWidth) break;
                         tries++;
-                    } while ((bx < 0 || bx >= COLS || by < 0 || by >= ROWS) && tries < 20);
-                    if (bx < 0 || bx >= COLS || by < 0 || by >= ROWS) continue;
+                    } while (tries < 40);
+                    if (tries >= 40) continue;
                 } else {
                     bx = Math.floor(Math.random() * COLS);
                     by = Math.floor(ROWS * 0.22 + Math.random() * (ROWS * 0.12));
@@ -928,7 +923,7 @@
                         const idx = r * COLS + c;
                         if (wallMask && wallMask[idx]) continue;
                         const depth = triangleFlipped
-                            ? (c * ROWS + r * COLS - COLS * ROWS)  // ミラー時
+                            ? (COLS * ROWS - c * ROWS - r * COLS)  // 上下反転時（左上直角）
                             : (r * COLS - c * ROWS);
                         // 縞の位相で砂か空気かを決め、端で少しランダムさを加える
                         if (depth >= 0 && depth < stripeWidth && Math.random() < 0.5) {
