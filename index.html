@@ -877,9 +877,9 @@
         function applyTankShape(key) {
             tankShape = key;
             computeWallMask(key);
-            for (let i = 0; i < wallMask.length; i++) {
-                if (wallMask[i]) grid[i] = 0;
-            }
+            grid.fill(0);
+            initBubbles();
+            initSand();
             setTankTheme(key);
             localStorage.setItem('sandpicture_active_tank', key);
         }
