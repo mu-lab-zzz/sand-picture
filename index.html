@@ -757,9 +757,9 @@
                         const rad = COLS / 2 - 1;
                         inside = (c-cx)*(c-cx) + (r-cy)*(r-cy) <= rad*rad;
                     } else if (shape === 'triangle') {
-                        // 右上→右下→左下の直角三角形 (右角：右下)
+                        // 右上→右下→左下の直角三角形 (直角：右下)
                         // 斜辺: top-right(COLS,0)→bottom-left(0,ROWS)
-                        inside = (c / COLS + r / ROWS) <= 1.0;
+                        inside = (c / COLS + r / ROWS) >= 1.0;
                     } else if (shape === 'oval') {
                         const rx = cx - 1, ry = cy - 1;
                         inside = (c-cx)*(c-cx)/(rx*rx) + (r-cy)*(r-cy)/(ry*ry) <= 1;
