@@ -1196,60 +1196,51 @@
         let lastCanvasX = null;
         let lastCanvasY = null;
 
-        function applyTouchInfluence(e) {
-            if (!isInteracting) return;
-            
-            let clientX, clientY;
-            if (e.touches && e.touches.length > 0) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-            } else {
-                clientX = e.clientX;
-                clientY = e.clientY;
-            }
-
+        function getCanvasCoords(clientX, clientY) {
             const rect = canvas.getBoundingClientRect();
-            const canvasX = Math.floor(((clientX - rect.left) / rect.width) * COLS);
-            const canvasY = Math.floor(((clientY - rect.top) / rect.height) * ROWS);
+            return {
+                x: Math.floor(((clientX - rect.left) / rect.width)  * COLS),
+                y: Math.floor(((clientY - rect.top)  / rect.height) * ROWS),
+            };
+        }
+
+        function applyTouchInfluence(clientX, clientY) {
+            if (!isInteracting) return;
+            const { x: canvasX, y: canvasY } = getCanvasCoords(clientX, clientY);
 
             if (lastCanvasX !== null && lastCanvasY !== null) {
-                let vx = canvasX - lastCanvasX;
-                let vy = canvasY - lastCanvasY;
-                
+                const vx = canvasX - lastCanvasX;
+                const vy = canvasY - lastCanvasY;
+
                 if (vx !== 0 || vy !== 0) {
                     const speed = Math.sqrt(vx * vx + vy * vy);
                     const brushRadius = Math.max(4, Math.floor((8 + speed * 0.4) / SCALE));
 
-                    let cellsToMove = [];
+                    const cellsToMove = [];
                     for (let r = Math.max(0, canvasY - brushRadius); r <= Math.min(ROWS - 1, canvasY + brushRadius); r++) {
                         for (let c = Math.max(0, canvasX - brushRadius); c <= Math.min(COLS - 1, canvasX + brushRadius); c++) {
-                            if ((c - canvasX) * (c - canvasX) + (r - canvasY) * (r - canvasY) <= brushRadius * brushRadius) {
-                                if (grid[r][c] > 0) {
-                                    cellsToMove.push({ r: r, c: c, type: grid[r][c] });
-                                }
+                            if ((c-canvasX)*(c-canvasX) + (r-canvasY)*(r-canvasY) <= brushRadius*brushRadius) {
+                                const gi = r * COLS + c;
+                                if (grid[gi] > 0 && !(wallMask && wallMask[gi]))
+                                    cellsToMove.push({ r, c, type: grid[gi] });
                             }
                         }
                     }
 
                     cellsToMove.sort(() => Math.random() - 0.5);
 
-                    for (let cell of cellsToMove) {
-                        let moveDist = Math.min(6, Math.max(1, Math.floor(speed * 0.3)));
-                        let dx = Math.round((vx / speed) * moveDist) + (Math.floor(Math.random() * 3) - 1);
-                        let dy = Math.round((vy / speed) * moveDist) + (Math.floor(Math.random() * 3) - 1);
-
-                        let nr = cell.r + dy;
-                        let nc = cell.c + dx;
-
+                    for (const cell of cellsToMove) {
+                        const moveDist = Math.min(6, Math.max(1, Math.floor(speed * 0.3)));
+                        const dx = Math.round((vx / speed) * moveDist) + (Math.floor(Math.random() * 3) - 1);
+                        const dy = Math.round((vy / speed) * moveDist) + (Math.floor(Math.random() * 3) - 1);
+                        const nr = cell.r + dy, nc = cell.c + dx;
                         if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
-                            if (grid[nr][nc] === 0) {
-                                grid[nr][nc] = cell.type;
-                                grid[cell.r][cell.c] = 0;
-                            } 
-                            else if (grid[nr][nc] > 0 && Math.random() < 0.7) {
-                                let temp = grid[nr][nc];
-                                grid[nr][nc] = cell.type;
-                                grid[cell.r][cell.c] = temp;
+                            const ni = nr * COLS + nc, ci = cell.r * COLS + cell.c;
+                            if (wallMask && wallMask[ni]) continue;
+                            if (grid[ni] === 0) {
+                                grid[ni] = cell.type; grid[ci] = 0;
+                            } else if (Math.random() < 0.7) {
+                                const tmp = grid[ni]; grid[ni] = cell.type; grid[ci] = tmp;
                             }
                         }
                     }
@@ -1260,40 +1251,37 @@
             lastCanvasY = canvasY;
         }
 
-        canvas.addEventListener('mousedown', (e) => {
+        const interactEl = document.getElementById('canvas-ring');
+
+        interactEl.addEventListener('mousedown', (e) => {
             isInteracting = true;
-            const rect = canvas.getBoundingClientRect();
-            lastCanvasX = Math.floor(((e.clientX - rect.left) / rect.width) * COLS);
-            lastCanvasY = Math.floor(((e.clientY - rect.top) / rect.height) * ROWS);
-            applyTouchInfluence(e);
+            const { x, y } = getCanvasCoords(e.clientX, e.clientY);
+            lastCanvasX = x; lastCanvasY = y;
+            applyTouchInfluence(e.clientX, e.clientY);
         });
         window.addEventListener('mousemove', (e) => {
-            applyTouchInfluence(e);
+            applyTouchInfluence(e.clientX, e.clientY);
         });
         window.addEventListener('mouseup', () => {
-            isInteracting = false;
-            lastCanvasX = null;
-            lastCanvasY = null;
+            isInteracting = false; lastCanvasX = null; lastCanvasY = null;
         });
 
-        canvas.addEventListener('touchstart', (e) => {
+        interactEl.addEventListener('touchstart', (e) => {
             isInteracting = true;
-            if (e.touches && e.touches.length > 0) {
-                const rect = canvas.getBoundingClientRect();
-                lastCanvasX = Math.floor(((e.touches[0].clientX - rect.left) / rect.width) * COLS);
-                lastCanvasY = Math.floor(((e.touches[0].clientY - rect.top) / rect.height) * ROWS);
+            if (e.touches.length > 0) {
+                const { x, y } = getCanvasCoords(e.touches[0].clientX, e.touches[0].clientY);
+                lastCanvasX = x; lastCanvasY = y;
             }
-            applyTouchInfluence(e);
-            if (e.cancelable) e.preventDefault(); 
+            applyTouchInfluence(e.touches[0].clientX, e.touches[0].clientY);
+            if (e.cancelable) e.preventDefault();
         }, { passive: false });
-        canvas.addEventListener('touchmove', (e) => {
-            applyTouchInfluence(e);
+        interactEl.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0)
+                applyTouchInfluence(e.touches[0].clientX, e.touches[0].clientY);
             if (e.cancelable) e.preventDefault();
         }, { passive: false });
         window.addEventListener('touchend', () => {
-            isInteracting = false;
-            lastCanvasX = null;
-            lastCanvasY = null;
+            isInteracting = false; lastCanvasX = null; lastCanvasY = null;
         });
 
         document.getElementById('weightToggleBtn').addEventListener('click', () => {
