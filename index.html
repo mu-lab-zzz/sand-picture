@@ -883,20 +883,13 @@
             for (let i = 0; i < numBubbles; i++) {
                 let bx, by;
                 if (tankShape === 'triangle') {
-                    // 斜辺に沿った帯の中にランダム配置
-                    const stripeWidth = Math.round(ROWS * COLS * 0.12);
-                    // 斜辺に沿ったバンド内にランダム配置（rejection sampling）
+                    // 上35%の行にランダム散布（泡は上に浮くので上部に配置）
                     let tries = 0;
                     do {
-                        const t = 0.05 + Math.random() * 0.9;
-                        bx = Math.floor(t * COLS);
-                        by = Math.floor(t * ROWS);
-                        const depth = triangleFlipped
-                            ? (COLS * ROWS - bx * ROWS - by * COLS)
-                            : (by * COLS - bx * ROWS);
-                        if (depth >= 0 && depth < stripeWidth) break;
+                        bx = Math.floor(Math.random() * COLS);
+                        by = Math.floor(Math.random() * ROWS * 0.35);
                         tries++;
-                    } while (tries < 40);
+                    } while (tries < 40 && (wallMask && wallMask[by * COLS + bx]));
                     if (tries >= 40) continue;
                 } else {
                     bx = Math.floor(Math.random() * COLS);
@@ -918,18 +911,13 @@
 
         function initSand() {
             if (tankShape === 'triangle') {
-                // 斜辺に平行な縞模様で三角形全体に砂と空気を分散配置
-                // depth = r*COLS - c*ROWS (0=斜辺, ROWS*COLS=直角頂点)
-                const stripeWidth = Math.round(ROWS * COLS * 0.12); // 縞幅
-                for (let r = 0; r < ROWS; r++) {
+                // 下45%の行に砂をびっしり（重力で自然に底に溜まった状態）
+                const sandStart = Math.floor(ROWS * 0.55);
+                for (let r = sandStart; r < ROWS; r++) {
                     for (let c = 0; c < COLS; c++) {
                         const idx = r * COLS + c;
                         if (wallMask && wallMask[idx]) continue;
-                        const depth = triangleFlipped
-                            ? (COLS * ROWS - c * ROWS - r * COLS)  // 上下反転時（左上直角）
-                            : (r * COLS - c * ROWS);
-                        // 縞の位相で砂か空気かを決め、端で少しランダムさを加える
-                        if (depth >= 0 && depth < stripeWidth && Math.random() < 0.5) {
+                        if (Math.random() < 0.88) {
                             const rand = Math.random();
                             grid[idx] = rand < 0.25 ? 2 : rand < 0.50 ? 3 : rand < 0.80 ? 4 : 5;
                         }
