@@ -565,6 +565,8 @@
         let tiltEnabled = false;
         let isFlipped = false;
         let debugMode = false;
+        let tankShape = 'rect';
+        let wallMask  = null;
         let tiltX = 0;
         let weightDifferenceEnabled = true;
         let fpsVisible = false;
@@ -636,6 +638,8 @@
 
             grid = new Uint8Array(SIZE);
             moved = new Uint8Array(SIZE);
+            wallMask = new Uint8Array(SIZE);
+            computeWallMask(tankShape);
 
             precomputedNoise = new Float32Array(SIZE);
             precomputedSparkle = new Float32Array(SIZE);
@@ -667,6 +671,51 @@
             4: { r: 112, g: 76,  b: 45 },
             5: { r: 205, g: 127, b: 50 }
         };
+
+        function computeWallMask(shape) {
+            if (!wallMask || wallMask.length !== ROWS * COLS) wallMask = new Uint8Array(ROWS * COLS);
+            wallMask.fill(0);
+            if (shape === 'rect') return;
+            const cx = COLS / 2, cy = ROWS / 2;
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    let inside = false;
+                    if (shape === 'porthole' || shape === 'crystal') {
+                        const rad = Math.min(cx, cy) - 1;
+                        inside = (c-cx)*(c-cx) + (r-cy)*(r-cy) <= rad*rad;
+                    } else if (shape === 'oval') {
+                        const rx = cx - 1, ry = cy - 1;
+                        inside = (c-cx)*(c-cx)/(rx*rx) + (r-cy)*(r-cy)/(ry*ry) <= 1;
+                    } else if (shape === 'hourglass') {
+                        const topCy = ROWS * 0.27, botCy = ROWS * 0.73;
+                        const rad   = ROWS * 0.22;
+                        const neckW = Math.max(3, Math.floor(COLS * 0.07));
+                        const inTop  = (c-cx)*(c-cx) + (r-topCy)*(r-topCy) <= rad*rad;
+                        const inBot  = (c-cx)*(c-cx) + (r-botCy)*(r-botCy) <= rad*rad;
+                        const inNeck = Math.abs(c-cx) <= neckW && r > topCy && r < botCy;
+                        inside = inTop || inBot || inNeck;
+                    }
+                    if (!inside) wallMask[r*COLS+c] = 1;
+                }
+            }
+        }
+
+        function applyTankShape(key) {
+            tankShape = key;
+            computeWallMask(key);
+            for (let i = 0; i < wallMask.length; i++) {
+                if (wallMask[i]) grid[i] = 0;
+            }
+            const clipMap = {
+                rect:      'none',
+                porthole:  'circle(49.5% at 50% 50%)',
+                crystal:   'circle(49.5% at 50% 50%)',
+                oval:      'ellipse(49.5% 49.5% at 50% 50%)',
+                hourglass: 'none',
+            };
+            canvas.style.clipPath = clipMap[key] || 'none';
+            localStorage.setItem('sandpicture_active_tank', key);
+        }
 
         function applySandColors(key) {
             const c = SAND_COLORS[key].colors;
@@ -703,7 +752,7 @@
                     for (let c = cMin; c <= cMax; c++) {
                         if ((c-bx)*(c-bx) + (r-by)*(r-by) <= br*br) {
                             const idx = r * COLS + c;
-                            if (grid[idx] === 0) grid[idx] = 1;
+                            if (grid[idx] === 0 && !(wallMask && wallMask[idx])) grid[idx] = 1;
                         }
                     }
                 }
@@ -711,13 +760,15 @@
         }
 
         function initSand() {
-            const sandRows = Math.floor(ROWS * 0.225);
+            const sandRows = Math.floor(ROWS * 0.3);
             for (let r = 0; r < sandRows; r++) {
                 const base = r * COLS;
                 for (let c = 0; c < COLS; c++) {
+                    const idx = base + c;
+                    if (wallMask && wallMask[idx]) continue;
                     if (Math.random() < 0.9) {
                         const rand = Math.random();
-                        grid[base + c] = rand < 0.25 ? 2 : rand < 0.50 ? 3 : rand < 0.80 ? 4 : 5;
+                        grid[idx] = rand < 0.25 ? 2 : rand < 0.50 ? 3 : rand < 0.80 ? 4 : 5;
                     }
                 }
             }
@@ -764,6 +815,7 @@
                     const rc = rOff + c;
 
                     if (moved[rc]) continue;
+                    if (wallMask && wallMask[rc]) continue;
                     const type = grid[rc];
 
                     if (type >= 2) {
@@ -799,6 +851,7 @@
                                 const nr = r + dr, nc = c + dc;
                                 if (nc < 0 || nc >= COLS) continue;
                                 const nIdx = (r + dr) * COLS + nc;
+                                if (wallMask && wallMask[nIdx]) continue;
                                 const t = grid[nIdx];
                                 if (t === 0) {
                                     grid[nIdx] = type; grid[rc] = 0; moved[nIdx] = 1;
@@ -814,8 +867,8 @@
                             if (Math.random() > 0.2) continue;
 
                             const leftC = c - 1, rightC = c + 1;
-                            const gl = leftC >= 0 ? grid[r1Off + leftC] : -1;
-                            const gr = rightC < COLS ? grid[r1Off + rightC] : -1;
+                            const gl = leftC >= 0  && !(wallMask && wallMask[r1Off+leftC])  ? grid[r1Off+leftC]  : -1;
+                            const gr = rightC < COLS && !(wallMask && wallMask[r1Off+rightC]) ? grid[r1Off+rightC] : -1;
                             const leftEmpty  = gl === 0 || (gl === 1 && Math.random() < 0.002);
                             const rightEmpty = gr === 0 || (gr === 1 && Math.random() < 0.002);
 
@@ -880,7 +933,13 @@
                     const type = grid[gi];
                     const idx = gi * 4;
 
-                    if (type <= 1) {
+                    if (wallMask && wallMask[gi]) {
+                        data[idx]     = 22;
+                        data[idx + 1] = 12;
+                        data[idx + 2] = 5;
+                        data[idx + 3] = 255;
+                        sandThickness[c] = 0;
+                    } else if (type <= 1) {
                         data[idx]     = 26;
                         data[idx + 1] = 26;
                         data[idx + 2] = 46;
@@ -1307,6 +1366,21 @@
             bgm:  [{ name: '瞑想', price: 40 }, { name: '波音', price: 40 }, { name: '雨音', price: 40 }],
         };
 
+        const TANK_SHAPES = {
+            rect:      { name: '長方形',       price: 0,  desc: 'デフォルト' },
+            porthole:  { name: 'ポートホール', price: 40, desc: '真鍮リング' },
+            crystal:   { name: 'クリスタル球', price: 30, desc: '細ライン' },
+            hourglass: { name: '砂時計',       price: 60, desc: '上下2球' },
+            oval:      { name: '縦楕円',       price: 30, desc: 'なめらか楕円' },
+        };
+
+        function loadOwnedTanks() {
+            try { return JSON.parse(localStorage.getItem('sandpicture_owned_tanks') || '["rect"]'); }
+            catch(e) { return ['rect']; }
+        }
+        function saveOwnedTanks(arr) { localStorage.setItem('sandpicture_owned_tanks', JSON.stringify(arr)); }
+        function loadActiveTank() { return localStorage.getItem('sandpicture_active_tank') || 'rect'; }
+
         function loadOwnedSands() {
             try { return JSON.parse(localStorage.getItem('sandpicture_owned_sands') || '["desert"]'); }
             catch(e) { return ['desert']; }
@@ -1326,6 +1400,51 @@
             const grid = document.getElementById('store-grid');
             const owned = loadOwnedSands();
             const active = loadActiveSand();
+
+            if (tab === 'tank') {
+                const ownedT = loadOwnedTanks();
+                const activeT = loadActiveTank();
+                grid.innerHTML = Object.entries(TANK_SHAPES).map(([key, s]) => {
+                    const isOwned  = ownedT.includes(key);
+                    const isActive = activeT === key;
+                    const cls = isActive ? 'store-item active' : isOwned ? 'store-item owned' : 'store-item';
+                    const btn = isActive
+                        ? `<button disabled style="opacity:0.5;">使用中</button>`
+                        : isOwned
+                        ? `<button data-tank="${key}" data-owned="1">選択</button>`
+                        : `<button data-tank="${key}">🪙 ${s.price}</button>`;
+                    return `<div class="${cls}">
+                        <div class="item-icon" style="font-size:18px;color:#5c4a3e;">${key==='rect'?'▭':key==='porthole'?'⊕':key==='crystal'?'○':key==='hourglass'?'⧗':'⬭'}</div>
+                        <div>${s.name}</div>
+                        <div style="font-size:9px;color:#5c4a3e;">${s.desc}</div>
+                        ${btn}
+                    </div>`;
+                }).join('');
+                grid.querySelectorAll('button[data-tank]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const key = btn.dataset.tank;
+                        if (btn.dataset.owned) {
+                            applyTankShape(key);
+                            initBubbles(); initSand();
+                            renderStore('tank');
+                            return;
+                        }
+                        const coins = loadCoins();
+                        const price = TANK_SHAPES[key].price;
+                        if (!debugMode) {
+                            if (coins < price) { alert('コインが足りません'); return; }
+                            saveCoins(coins - price);
+                        }
+                        const owned = loadOwnedTanks();
+                        owned.push(key);
+                        saveOwnedTanks(owned);
+                        applyTankShape(key);
+                        initBubbles(); initSand();
+                        renderStore('tank');
+                    });
+                });
+                return;
+            }
 
             if (tab === 'sand') {
                 grid.innerHTML = Object.entries(SAND_COLORS).map(([key, s]) => {
@@ -1443,10 +1562,12 @@
             navigator.serviceWorker.register('./sw.js');
         }
 
+        tankShape = loadActiveTank();
         setupSimulation();
         initBubbles();
         initSand();
         applyLoadedSettings();
+        canvas.style.clipPath = { rect:'none', porthole:'circle(49.5% at 50% 50%)', crystal:'circle(49.5% at 50% 50%)', oval:'ellipse(49.5% 49.5% at 50% 50%)', hourglass:'none' }[tankShape] || 'none';
         loop();
     </script>
 </body>
