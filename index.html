@@ -632,6 +632,7 @@
 
         let tiltEnabled = false;
         let isFlipped = false;
+        let triangleFlipped = false;
         let debugMode = false;
         let tankShape = 'rect';
         let wallMask  = null;
@@ -757,9 +758,9 @@
                         const rad = COLS / 2 - 1;
                         inside = (c-cx)*(c-cx) + (r-cy)*(r-cy) <= rad*rad;
                     } else if (shape === 'triangle') {
-                        // 左上→左下→右下の直角三角形 (直角：左下)
-                        // 斜辺: top-left(0,0)→bottom-right(COLS,ROWS) = 上辺
-                        inside = r * COLS >= c * ROWS;
+                        inside = triangleFlipped
+                            ? (c * ROWS + r * COLS >= COLS * ROWS)  // 右下直角
+                            : (r * COLS >= c * ROWS);               // 左下直角
                     } else if (shape === 'oval') {
                         const rx = cx - 1, ry = cy - 1;
                         inside = (c-cx)*(c-cx)/(rx*rx) + (r-cy)*(r-cy)/(ry*ry) <= 1;
@@ -810,8 +811,9 @@
             ring.style.boxShadow = shadows[key] || '';
 
             // canvas-clip の clip-path
-            // triangle: 左上(0,0)→左下(0,100%)→右下(100%,100%) 直角左下、斜辺が上
-            const triPath = 'path("M 0 35 L 0 370 Q 0 400 30 400 L 265 400 Q 300 400 279 372 L 21 28 Q 0 0 0 35 Z")';
+            const triNormal  = 'path("M 0 35 L 0 370 Q 0 400 30 400 L 265 400 Q 300 400 279 372 L 21 28 Q 0 0 0 35 Z")';
+            const triMirror  = 'path("M 300 35 L 300 370 Q 300 400 270 400 L 35 400 Q 0 400 21 372 L 279 28 Q 300 0 300 35 Z")';
+            const triPath = triangleFlipped ? triMirror : triNormal;
             const clips = {
                 rect:     'none',
                 crystal:  'circle(49.5% at 50% 50%)',
@@ -824,7 +826,9 @@
 
             // SVG オーバーレイ（triangle のみ木目フレーム描画）
             if (key === 'triangle') {
-                const p = 'M 0 35 L 0 370 Q 0 400 30 400 L 265 400 Q 300 400 279 372 L 21 28 Q 0 0 0 35 Z';
+                const p = triangleFlipped
+                    ? 'M 300 35 L 300 370 Q 300 400 270 400 L 35 400 Q 0 400 21 372 L 279 28 Q 300 0 300 35 Z'
+                    : 'M 0 35 L 0 370 Q 0 400 30 400 L 265 400 Q 300 400 279 372 L 21 28 Q 0 0 0 35 Z';
                 overlay.innerHTML = `<svg viewBox="0 0 300 400" width="100%" height="100%"
                     xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;">
                     <path d="${p}" fill="none" stroke="#1a0e06" stroke-width="18" stroke-linejoin="round"/>
@@ -897,7 +901,9 @@
                     for (let c = 0; c < COLS; c++) {
                         const idx = r * COLS + c;
                         if (wallMask && wallMask[idx]) continue;
-                        const depth = r * COLS - c * ROWS;
+                        const depth = triangleFlipped
+                            ? (c * ROWS + r * COLS - COLS * ROWS)  // ミラー時
+                            : (r * COLS - c * ROWS);
                         // 縞の位相で砂か空気かを決め、端で少しランダムさを加える
                         const phase = depth % (stripeWidth * 2);
                         const isSandStripe = phase < stripeWidth;
@@ -1151,6 +1157,17 @@
         }
 
         function flip() {
+            if (tankShape === 'triangle') {
+                // 三角形は水槽ごと左右ミラー
+                triangleFlipped = !triangleFlipped;
+                computeWallMask('triangle');
+                grid.fill(0);
+                initBubbles();
+                initSand();
+                setTankTheme('triangle');
+                return;
+            }
+            // 通常：上下反転
             const newGrid = new Uint8Array(ROWS * COLS);
             for (let r = 0; r < ROWS; r++) {
                 const rOff = r * COLS;
